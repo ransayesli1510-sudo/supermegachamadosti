@@ -4,11 +4,51 @@
  */
 
 // --- State Management ---
+// --- State Management ---
 const store = {
-    view: 'home', // home, login, create-ticket, dashboard
-    user: null, // null, { username, role }
+    view: 'home',
+    user: null, // null, { username, role, email }
     tickets: JSON.parse(localStorage.getItem('tickets')) || [],
+    users: loadUsersSafe()
 };
+
+function loadUsersSafe() {
+    try {
+        const u = JSON.parse(localStorage.getItem('users'));
+        return Array.isArray(u) ? u : [];
+    } catch (e) {
+        console.error("Error loading users", e);
+        return [];
+    }
+}
+
+// --- Initialization ---
+function init() {
+    initUsers(); // Seed users if empty
+    setupEventListeners();
+    checkAuthSession();
+    updateUI();
+}
+
+function initUsers() {
+    if (store.users.length === 0) {
+        seedDefaultUsers();
+    }
+}
+
+function seedDefaultUsers() {
+    const seedUsers = [
+        { email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
+        { email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
+        { email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
+    ];
+    store.users = seedUsers;
+    saveUsers();
+}
+
+function saveUsers() {
+    localStorage.setItem('users', JSON.stringify(store.users));
+}
 
 // --- DOM Elements ---
 const views = {
@@ -32,13 +72,6 @@ const dom = {
         login: document.getElementById('login-form')
     }
 };
-
-// --- Initialization ---
-function init() {
-    setupEventListeners();
-    checkAuthSession();
-    updateUI();
-}
 
 // --- Navigation & Routing ---
 function showSection(sectionId) {
@@ -74,16 +107,34 @@ function checkAuthSession() {
 
 function handleLogin(e) {
     e.preventDefault();
-    const username = e.target.username.value;
-    const password = e.target.password.value;
+    const usernameInput = e.target.username.value.trim();
+    const passwordInput = e.target.password.value;
 
-    // Simulated Auth Logic
-    if (username === 'admin' && password === 'admin123') {
-        loginSuccess({ username: 'Admin', role: 'admin' });
-    } else if (username === 'user' && password === 'user123') {
-        loginSuccess({ username: 'Usuário', role: 'user' });
+    // Resolve Alias: 'admin' maps to the Ransay account
+    let targetEmail = usernameInput;
+    if (usernameInput.toLowerCase() === 'admin') {
+        targetEmail = 'ransay@supermegavendas.com';
+    }
+
+    // 1. Find User
+    let user = store.users.find(u => u.email === targetEmail);
+
+    // Self-Healing
+    if (!user && targetEmail === 'ransay@supermegavendas.com') {
+        console.warn("User database corrupted/empty. Re-seeding defaults.");
+        seedDefaultUsers();
+        user = store.users.find(u => u.email === targetEmail);
+    }
+
+    // 2. Validate Credentials
+    if (user) {
+        if (user.password === passwordInput) {
+            loginSuccess(user);
+        } else {
+            showToast('senha incorreta', 'error');
+        }
     } else {
-        showToast('Usuário ou senha incorretos.', 'error');
+        showToast('Usuário não encontrado.', 'error');
     }
 }
 
@@ -286,6 +337,115 @@ window.updateTicketStatus = function (ticketId, newStatus) {
         showToast(`Status atualizado para ${newStatus}`, 'success');
     }
 };
+
+// --- Password Reset Logic (UI Modal) ---
+function handlePasswordResetRequest() {
+    if (!store.user) return;
+    openResetModal();
+}
+
+function openResetModal() {
+    const modal = document.getElementById('reset-modal');
+    const adminOption = document.getElementById('admin-reset-option');
+    const form = document.getElementById('reset-form');
+
+    // Reset state
+    form.reset();
+    toggleResetInput(); // Reset view
+
+    // Show/Hide "Other User" option based on role
+    if (store.user && store.user.role === 'admin') {
+        adminOption.classList.remove('hidden');
+    } else {
+        adminOption.classList.add('hidden');
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeResetModal() {
+    document.getElementById('reset-modal').classList.add('hidden');
+}
+
+function toggleResetInput() {
+    const resetType = document.querySelector('input[name="reset-type"]:checked').value;
+    const emailGroup = document.getElementById('reset-email-group');
+    const passSection = document.getElementById('new-password-section');
+
+    // Always show password section in this new flow because "Reset" implies changing it now
+    passSection.classList.remove('hidden');
+
+    if (resetType === 'other') {
+        emailGroup.classList.remove('hidden');
+        document.getElementById('reset-email').setAttribute('required', 'true');
+    } else {
+        emailGroup.classList.add('hidden');
+        document.getElementById('reset-email').removeAttribute('required');
+    }
+}
+
+function handleResetSubmit(e) {
+    e.preventDefault();
+    const resetType = document.querySelector('input[name="reset-type"]:checked').value;
+    const newPass = document.getElementById('new-password').value;
+    const confirmPass = document.getElementById('confirm-password').value;
+
+    let targetEmail = store.user.email; // Default to self logic
+
+    if (resetType === 'other') {
+        targetEmail = document.getElementById('reset-email').value;
+    }
+
+    // 1. Check if passwords match
+    if (newPass !== confirmPass) {
+        showToast('As senhas não coincidem.', 'error');
+        return;
+    }
+
+    // 2. Validate Empty
+    if (!newPass || newPass.length < 3) {
+        showToast('Senha muito curta.', 'error');
+        return;
+    }
+
+    // 3. Find User
+    const targetUserIndex = store.users.findIndex(u => u.email === targetEmail);
+
+    if (targetUserIndex === -1) {
+        // Mock validation for 'user' which is not a real email but a username in the seed
+        // The user request said "validate only confirming registered user".
+        // If typing 'user', we allow it for the demo sake if it matches seed.
+        if (targetEmail === 'user') {
+            const hackIndex = store.users.findIndex(u => u.email === 'user');
+            if (hackIndex > -1) {
+                updateUserPassword(hackIndex, newPass);
+                return;
+            }
+        }
+        showToast('Usuário não encontrado com este e-mail.', 'error');
+        return;
+    }
+
+    // 4. Validate New != Old
+    if (store.users[targetUserIndex].password === newPass) {
+        showToast('A nova senha deve ser diferente da anterior.', 'error');
+        return;
+    }
+
+    // 5. Update
+    updateUserPassword(targetUserIndex, newPass);
+}
+
+function updateUserPassword(index, newPass) {
+    store.users[index].password = newPass;
+    saveUsers();
+
+    showToast('Senha alterada com sucesso!', 'success');
+    closeResetModal();
+}
+
+// Remove old mailto logic
+function performReset(target) { }
 
 // --- Utilities ---
 function showToast(message, type = 'default') {
