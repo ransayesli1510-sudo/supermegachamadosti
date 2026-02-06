@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Mega Ti - Suporte Inteligente</title>
+    <meta name="description"
+        content="Abra seus chamados de TI em segundos. Suporte rápido e inteligente para sua empresa.">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Using Phosphor Icons for modern, clean icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-container">
+            <div class="logo">
+                <i class="ph ph-cube-transparent"></i>
+                <span>Super Mega <span class="highlight">Ti</span></span>
+            </div>
+            <nav class="nav">
+                <button id="nav-login-btn" class="btn btn-secondary">Login</button>
+                <button id="nav-ticket-btn" class="btn btn-primary">Abrir Chamado</button>
+                <button id="nav-logout-btn" class="btn btn-outline hidden">Sair</button>
+            </nav>
+        </div>
+    </header>
+
+    <main id="app-content">
+        <!-- Hero Section -->
+        <section id="hero" class="hero">
+            <div class="container hero-container">
+                <div class="hero-content">
+                    <span class="badge">Suporte TI 24/7</span>
+                    <h1>Abra seus chamados de TI <span class="text-gradient">em segundos</span></h1>
+                    <p>Esqueça a burocracia. Tenha atendimento rápido, histórico completo e suporte inteligente para
+                        focar no que realmente importa.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-lg btn-primary" onclick="showSection('ticket-form')">Abrir Chamado
+                            Agora</button>
+                        <button class="btn btn-lg btn-primary" onclick="scheduleConsultation()">Agendar
+                            consulta</button>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="glass-card float-card p1">
+                        <i class="ph ph-check-circle lg-icon success"></i>
+                        <div>
+                            <strong>Chamado #1024</strong>
+                            <span class="status-badge resolved">Resolvido</span>
+                        </div>
+                    </div>
+                    <div class="glass-card float-card p2">
+                        <i class="ph ph-clock lg-icon warning"></i>
+                        <div>
+                            <strong>Tempo Médio</strong>
+                            <span>15 minutos</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Benefits Section -->
+        <section id="benefits" class="benefits">
+            <div class="container">
+                <h2 class="section-title">Por que usar nosso Help Desk?</h2>
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="icon-box"><i class="ph ph-lightning"></i></div>
+                        <h3>Atendimento Rápido</h3>
+                        <p>Nossa equipe recebe seu chamado instantaneamente e prioriza urgências.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="icon-box"><i class="ph ph-list-dashes"></i></div>
+                        <h3>Histórico Completo</h3>
+                        <p>Acompanhe todos os seus chamados antigos e soluções aplicadas.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="icon-box"><i class="ph ph-robot"></i></div>
+                        <h3>Suporte IA</h3>
+                        <p>Triagem inteligente que direciona seu problema para o especialista certo.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="icon-box"><i class="ph ph-chart-line-up"></i></div>
+                        <h3>Em Tempo Real</h3>
+                        <p>Receba notificações a cada atualização do status do seu chamado.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- New Ticket Form Section -->
+        <section id="ticket-form" class="section-page hidden">
+            <div class="container">
+                <button class="btn-back" onclick="showHome()"><i class="ph ph-arrow-left"></i> Voltar</button>
+                <div class="form-wrapper glass-panel">
+                    <div class="form-header">
+                        <h2>Novo Chamado</h2>
+                        <p>Descreva seu problema detalhadamente para agilizar o atendimento.</p>
+                    </div>
+                    <form id="create-ticket-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="name">Nome Completo</label>
+                                <input type="text" id="name" required placeholder="Seu nome">
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email Corporativo</label>
+                                <input type="email" id="email" required placeholder="seu.email@empresa.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="department">Departamento</label>
+                                <select id="department" required>
+                                    <option value="" disabled selected>Selecione...</option>
+                                    <option value="Financeiro">Financeiro</option>
+                                    <option value="RH">Recursos Humanos</option>
+                                    <option value="Comercial">Comercial</option>
+                                    <option value="TI">TI / Desenvolvimento</option>
+                                    <option value="Operacional">Operacional</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="category">Categoria</label>
+                                <select id="category" required>
+                                    <option value="" disabled selected>Tipo de problema...</option>
+                                    <option value="Hardware">Hardware (Computador, Impressora)</option>
+                                    <option value="Software">Software (Office, Sistema)</option>
+                                    <option value="Rede">Internet / Rede</option>
+                                    <option value="Acesso">Login / Senha</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Descrição do Problema</label>
+                            <textarea id="description" rows="5" required
+                                placeholder="O que está acontecendo? Quando começou?"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="file-upload">
+                                <input type="file" id="attachment">
+                                <i class="ph ph-upload-simple"></i>
+                                <span>Anexar print ou arquivo (Opcional)</span>
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-block">Enviar Chamado</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Login Section -->
+        <section id="login" class="section-page hidden">
+            <div class="container">
+                <button class="btn-back" onclick="showHome()"><i class="ph ph-arrow-left"></i> Voltar</button>
+                <div class="login-wrapper glass-panel">
+                    <div class="login-header">
+                        <h2>Acesso ao Painel</h2>
+                        <p>Entre para gerenciar seus chamados.</p>
+                    </div>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="username">Usuário</label>
+                            <div class="input-icon">
+                                <i class="ph ph-user"></i>
+                                <input type="text" id="username" required placeholder="admin ou user">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Senha</label>
+                            <div class="input-icon">
+                                <i class="ph ph-lock-key"></i>
+                                <input type="password" id="password" required placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="form-footer">
+                            <small class="hint">Dica: admin/admin123 ou user/user123</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section-page hidden">
+            <div class="container">
+                <div class="dashboard-header">
+                    <div>
+                        <h2 id="dashboard-title">Meus Chamados</h2>
+                        <p id="dashboard-subtitle">Acompanhe o status das suas solicitações.</p>
+                    </div>
+                    <div class="dashboard-actions">
+                        <button class="btn btn-outline" onclick="showSection('ticket-form')"><i class="ph ph-plus"></i>
+                            Novo Chamado</button>
+                    </div>
+                </div>
+
+                <div class="dashboard-stats" id="admin-stats">
+                    <!-- Populated by JS for admin -->
+                </div>
+
+                <div class="table-container glass-panel">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Assunto/Categoria</th>
+                                <th>Solicitante</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th class="actions-col">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tickets-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="empty-state hidden">
+                        <i class="ph ph-files"></i>
+                        <p>Nenhum chamado encontrado.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Super Mega Ti. Todos os direitos reservados.</p>
+            <div class="social-links">
+                <a href="#"><i class="ph ph-linkedin-logo"></i></a>
+                <a href="#"><i class="ph ph-instagram-logo"></i></a>
+                <a href="#"><i class="ph ph-envelope"></i> suporte@supermegati.com</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden">
+        <i class="icon ph"></i>
+        <div class="message"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
