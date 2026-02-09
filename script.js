@@ -5,9 +5,9 @@
 
 // --- GitHub as Database Configuration ---
 const githubConfig = {
-    username: "ransayesli1510-sudo", // Replace with your GitHub Username
-    repo: "supermegachamadosti",     // Replace with your Repository Name
-    token: "YOUR_GITHUB_PAT",        // Replace with your Personal Access Token
+    username: "ransayesli1510-sudo",
+    repo: "supermegachamadosti",
+    token: "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",
     branch: "main",
     path: "db.json"
 };
