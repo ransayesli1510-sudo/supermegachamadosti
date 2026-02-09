@@ -92,10 +92,84 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- Supabase initialization is handled in supabase-config.js ---
+// --- GitHub as Database Configuration ---
+const githubConfig = {
+    username: "ransayesli1510-sudo",
+    repo: "supermegachamadosti",
+    token: "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",
+    branch: "main",
+    path: "db.json"
+};
 
+// --- GitHub API Helpers ---
+let dbFileSha = null;
 
-// GitHub functions removed in favor of Supabase helper functions in supabase-db.js
+async function fetchDB() {
+    ErrorLogger.info("Sincronizando com GitHub...");
+    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        dbFileSha = data.sha;
+        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
+        return JSON.parse(decodedContent);
+    } catch (error) {
+        ErrorLogger.error("Erro ao ler banco do GitHub", error);
+        return null;
+    }
+}
+
+async function saveDB(newData) {
+    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
+
+    // Get latest SHA
+    try {
+        const check = await fetch(url + `?t=${Date.now()}`, {
+            headers: { 'Authorization': `token ${githubConfig.token}` }
+        });
+        if (check.ok) {
+            const checkData = await check.json();
+            dbFileSha = checkData.sha;
+        }
+    } catch (e) { }
+
+    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+    const body = {
+        message: "Update DB via App",
+        content: contentEncoded,
+        sha: dbFileSha,
+        branch: githubConfig.branch
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            dbFileSha = data.content.sha;
+            return true;
+        }
+        return false;
+    } catch (error) {
+        ErrorLogger.error("Erro ao salvar no GitHub", error);
+        return false;
+    }
+}
 
 
 
@@ -108,37 +182,28 @@ const store = {
 };
 
 
-// Subscriptions for Updates
-let ticketSubscription = null;
-async function startRealtimeSync() {
-    if (ticketSubscription) return;
-
-    // Initial Load
+// Polling for Updates (Simple Sync)
+let pollInterval = null;
+async function startPolling() {
+    if (pollInterval) return;
     await loadData();
-
-    // Subscribe to changes (Real-time instead of polling)
-    ticketSubscription = subscribeToTickets(() => {
-        loadData(true); // Silent update when database changes
-    });
+    pollInterval = setInterval(() => loadData(true), 15000); // 15s sync
 }
 
 async function loadData(silent = false) {
     if (!silent) updateStatus('syncing');
 
-    const result = await getTickets();
-    if (result.success) {
+    const data = await fetchDB();
+    if (data) {
         updateStatus('connected');
-        store.tickets = result.tickets || [];
+        store.tickets = data.tickets || [];
+        store.users = data.users || [];
 
-        if (!silent) ErrorLogger.info("Dados carregados do Supabase");
-
-        // Update UI if on dashboard
         if (store.view === 'dashboard' && store.user) {
             renderDashboard();
         }
     } else {
         updateStatus('error');
-        if (!silent) ErrorLogger.warn("Falha ao carregar dados do Supabase.");
     }
     // Initial fallbacks if empty (users are not fetched via getTickets, so keep this fallback)
     if (store.users.length === 0) {
@@ -157,7 +222,7 @@ function updateStatus(state) {
 
     if (state === 'connected') {
         dot.className = 'status-dot status-connected';
-        text.textContent = 'Conectado (Supabase)';
+        text.textContent = 'Conectado (GitHub)';
     } else if (state === 'error') {
         dot.className = 'status-dot status-error';
         text.textContent = 'Erro Conexão';
@@ -212,16 +277,12 @@ function createStatusUI() {
 // --- Initialization ---
 function init() {
     createStatusUI();
-    const isSupabaseReady = initSupabase();
-    if (isSupabaseReady) {
-        startRealtimeSync();
-    }
+    startPolling();
     setupEventListeners();
     checkAuthSession();
     updateUI();
 }
 
-// Helper to save entire store to DB
 async function persistStore() {
     const data = {
         tickets: store.tickets,
@@ -280,43 +341,54 @@ function showHome() {
 }
 
 // --- Authentication ---
-async function checkAuthSession() {
-    const result = await getCurrentUser();
-    if (result) {
-        store.user = result.profile;
-        // If on dashboard, load data
-        if (store.view === 'dashboard') {
-            await loadData();
-        }
+function checkAuthSession() {
+    const sessionUser = localStorage.getItem('currentUser');
+    if (sessionUser) {
+        store.user = JSON.parse(sessionUser);
     }
     updateNav();
 }
 
-async function handleLogin(e) {
+function handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
+    const email = document.getElementById('login-email').value.trim();
     const password = e.target.password.value;
 
-    const result = await signIn(email, password);
-    if (result.success) {
-        loginSuccess(result.profile); // Profile contains role
+    const user = store.users.find(u => u.email === email && u.password === password);
+    if (user) {
+        loginSuccess(user);
     } else {
-        showToast(result.error || 'Erro ao fazer login', 'error');
+        showToast('E-mail ou senha incorretos', 'error');
     }
 }
 
 async function handleSignUpSubmit(e) {
     e.preventDefault();
-    const name = document.getElementById('reg-name').value;
-    const email = document.getElementById('reg-email').value;
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
 
-    const result = await signUp(email, password, name);
-    if (result.success) {
-        showToast('Conta criada! Por favor, entre.', 'success');
+    if (store.users.find(u => u.email === email)) {
+        showToast('E-mail já cadastrado', 'error');
+        return;
+    }
+
+    const newUser = {
+        id: 'u' + Date.now(),
+        email,
+        password,
+        full_name: name,
+        role: 'user'
+    };
+
+    store.users.push(newUser);
+    const success = await persistStore();
+
+    if (success) {
+        showToast('Conta criada com sucesso!', 'success');
         toggleToLogin();
     } else {
-        showToast(result.error || 'Erro ao criar conta', 'error');
+        showToast('Erro ao salvar usuário no GitHub', 'error');
     }
 }
 
@@ -330,18 +402,19 @@ function toggleToLogin() {
     dom.forms.login.classList.remove('hidden');
 }
 
-function loginSuccess(profile) {
-    store.user = profile;
+function loginSuccess(user) {
+    store.user = user;
+    localStorage.setItem('currentUser', JSON.stringify(user));
     dom.forms.login.reset();
-    showToast(`Bem-vindo, ${profile.full_name}!`, 'success');
+    showToast(`Bem-vindo, ${user.full_name || user.username}!`, 'success');
     updateNav();
     showSection('dashboard');
-    loadData(); // Fetch tickets for the logged in user
+    renderDashboard();
 }
 
-async function handleLogout() {
-    await signOut();
+function handleLogout() {
     store.user = null;
+    localStorage.removeItem('currentUser');
     updateNav();
     showHome();
     showToast('Você saiu do sistema.');
@@ -382,32 +455,37 @@ async function handleSubmitTicket(e) {
     btn.textContent = 'Enviando...';
     btn.disabled = true;
 
-    const formData = {
-        name: e.target.name.value,
-        email: e.target.email.value,
-        department: e.target.department.value,
+    const ticket = {
+        id: '#' + Math.floor(1000 + Math.random() * 9000),
         category: e.target.category.value,
         description: e.target.description.value,
+        department: e.target.department.value,
+        status: 'Aberto',
+        created_at: new Date().toISOString(),
+        created_by: store.user ? store.user.id : null,
+        full_name: e.target.name.value,
+        email: e.target.email.value,
         attachment: document.getElementById('attachment').files[0] ? document.getElementById('attachment').files[0].name : null
     };
 
-    const result = await createTicket(formData);
+    store.tickets.unshift(ticket);
+    const success = await persistStore();
 
     btn.textContent = originalText;
     btn.disabled = false;
 
-    if (result.success) {
+    if (success) {
         showToast('Chamado enviado com sucesso!', 'success');
         e.target.reset();
 
         if (store.user) {
-            await loadData();
             showSection('dashboard');
+            renderDashboard();
         } else {
             showHome();
         }
     } else {
-        showToast('Erro ao enviar chamado. Tente novamente.', 'error');
+        showToast('Erro ao sincronizar com GitHub.', 'error');
     }
 }
 
@@ -426,7 +504,6 @@ function renderDashboard() {
     // Filter tickets based on role
     let displayTickets = store.tickets;
     if (store.user.role !== 'admin') {
-        // User sees only their own
         displayTickets = store.tickets.filter(t => t.created_by === store.user.id);
     }
 
@@ -469,12 +546,12 @@ function renderDashboard() {
         displayTickets.forEach(ticket => {
             const tr = document.createElement('tr');
             const dateStr = new Date(ticket.created_at).toLocaleDateString('pt-BR');
-            const creatorName = ticket.created_by_profile ? ticket.created_by_profile.full_name : 'Anônimo';
+            const creatorName = ticket.full_name || 'Anônimo';
 
             tr.innerHTML = `
-                <td><strong>#${ticket.id.substring(0, 4)}</strong></td>
+                <td><strong>${ticket.id}</strong></td>
                 <td>
-                    <div>${ticket.category} ${ticket.attachment_url ? '<i class="ph ph-paperclip" title="Anexo: ' + ticket.attachment_url + '"></i>' : ''}</div>
+                    <div>${ticket.category} ${ticket.attachment ? '<i class="ph ph-paperclip" title="Anexo: ' + ticket.attachment + '"></i>' : ''}</div>
                     <small style="color:var(--text-muted)">${ticket.description.substring(0, 30)}...</small>
                 </td>
                 <td>
@@ -494,13 +571,13 @@ function renderDashboard() {
 
 function getAdminActions(ticketId) {
     return `
-        <select onchange="updateTicketStatus('${ticketId}', this.value)" class="status-select">
+        < select onchange = "updateTicketStatus('${ticketId}', this.value)" class="status-select" >
             <option value="" disabled selected>Alterar...</option>
             <option value="Aberto">Aberto</option>
             <option value="Em atendimento">Em atendimento</option>
             <option value="Resolvido">Resolvido</option>
-        </select>
-    `;
+        </select >
+        `;
 }
 
 // Global scope for HTML inline calls
@@ -510,7 +587,7 @@ window.updateTicketStatus = function (ticketId, newStatus) {
         store.tickets[ticketIndex].status = newStatus;
         persistStore(); // Save to Git
         renderDashboard();
-        showToast(`Status atualizado para ${newStatus}`, 'success');
+        showToast(`Status atualizado para ${newStatus} `, 'success');
     }
 };
 
@@ -654,7 +731,7 @@ function handleRecoverySubmit(e) {
 
             // SIMULATION: Navigate to reset page after a delay, as if they clicked the link
             setTimeout(() => {
-                const confirmed = confirm(`[SIMULAÇÃO DE E-MAIL]\n\nOlá, ${userExists.username}.\n\nRecebemos um pedido para redefinir sua senha.\nClique em OK para redefinir agora.`);
+                const confirmed = confirm(`[SIMULAÇÃO DE E - MAIL]\n\nOlá, ${userExists.username}.\n\nRecebemos um pedido para redefinir sua senha.\nClique em OK para redefinir agora.`);
                 if (confirmed) {
                     recoveryEmailTemp = targetEmail;
                     showSection('reset-password-external');
@@ -711,7 +788,7 @@ function showToast(message, type = 'default') {
     const msg = toast.querySelector('.message');
 
     msg.textContent = message;
-    toast.className = `toast ${type}`;
+    toast.className = `toast ${type} `;
 
     if (type === 'success') icon.className = 'ph ph-check-circle lg-icon';
     else if (type === 'error') icon.className = 'ph ph-warning-circle lg-icon';
