@@ -400,8 +400,8 @@ function renderDashboard() {
     // Filter tickets based on role
     let displayTickets = store.tickets;
     if (store.user.role !== 'admin') {
-        // User sees only "Usuário" created tickets.
-        displayTickets = store.tickets.filter(t => t.byUser === 'Usuário');
+        // User sees only their own
+        displayTickets = store.tickets.filter(t => t.created_by === store.user.id);
     }
 
     // Render Stats for Admin

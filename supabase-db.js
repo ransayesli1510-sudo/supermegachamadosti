@@ -141,6 +141,7 @@ async function getTickets() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
 
+        // Base query
         let query = supabase
             .from('tickets')
             .select(`
@@ -157,22 +158,18 @@ async function getTickets() {
                 .eq('id', user.id)
                 .single();
 
-            // If not admin, show own tickets (including ones created while logged out if possible - though usually we only show own)
-            // Actually, if logged in and NOT admin, filter by created_by
+            // If not admin, show own tickets
             if (profile && profile.role !== 'admin') {
                 query = query.eq('created_by', user.id);
             }
         } else {
-            // If NOT logged in, we return nothing or an error since public can't view tickets
-            ErrorLogger.warn('Acesso negado: faça login para ver chamados');
-            return { success: false, error: 'Não autenticado' };
+            // If NOT logged in, return empty but success (so UI doesn't show error)
+            return { success: true, tickets: [] };
         }
 
         const { data, error } = await query;
-
         if (error) throw error;
 
-        ErrorLogger.success(`${data.length} chamados carregados`);
         return { success: true, tickets: data };
     } catch (error) {
         ErrorLogger.error('Erro ao carregar chamados', error);
