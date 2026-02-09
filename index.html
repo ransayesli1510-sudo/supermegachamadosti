@@ -173,10 +173,10 @@
                     </div>
                     <form id="login-form">
                         <div class="form-group">
-                            <label for="username">Usuário</label>
+                            <label for="login-email">E-mail</label>
                             <div class="input-icon">
-                                <i class="ph ph-user"></i>
-                                <input type="text" id="username" required placeholder="admin ou user">
+                                <i class="ph ph-envelope"></i>
+                                <input type="email" id="login-email" name="email" required placeholder="seu@email.com">
                             </div>
                         </div>
                         <div class="form-group">
@@ -189,8 +189,37 @@
                         <div class="form-footer">
                             <a href="#" onclick="showSection('forgot-password'); return false;"
                                 class="forgot-link">Esqueci minha senha?</a>
+                            <a href="#" id="toggle-register" class="forgot-link">Não tem conta? Cadastre-se</a>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+                        <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block">Entrar</button>
+                    </form>
+
+                    <form id="register-form" class="hidden">
+                        <div class="form-group">
+                            <label for="reg-name">Nome Completo</label>
+                            <div class="input-icon">
+                                <i class="ph ph-user"></i>
+                                <input type="text" id="reg-name" required placeholder="Seu nome">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">E-mail</label>
+                            <div class="input-icon">
+                                <i class="ph ph-envelope"></i>
+                                <input type="email" id="reg-email" required placeholder="seu@email.com">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password">Senha</label>
+                            <div class="input-icon">
+                                <i class="ph ph-lock-key"></i>
+                                <input type="password" id="reg-password" required placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="form-footer">
+                            <a href="#" id="toggle-login" class="forgot-link">Já tem conta? Entre aqui</a>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Criar Conta</button>
                     </form>
                 </div>
             </div>

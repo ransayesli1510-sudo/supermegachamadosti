@@ -251,7 +251,8 @@ const dom = {
     toast: document.getElementById('toast'),
     forms: {
         ticket: document.getElementById('create-ticket-form'),
-        login: document.getElementById('login-form')
+        login: document.getElementById('login-form'),
+        register: document.getElementById('register-form')
     }
 };
 
@@ -293,7 +294,7 @@ async function checkAuthSession() {
 
 async function handleLogin(e) {
     e.preventDefault();
-    const email = e.target.email.value;
+    const email = document.getElementById('login-email').value;
     const password = e.target.password.value;
 
     const result = await signIn(email, password);
@@ -302,6 +303,31 @@ async function handleLogin(e) {
     } else {
         showToast(result.error || 'Erro ao fazer login', 'error');
     }
+}
+
+async function handleSignUpSubmit(e) {
+    e.preventDefault();
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+
+    const result = await signUp(email, password, name);
+    if (result.success) {
+        showToast('Conta criada! Por favor, entre.', 'success');
+        toggleToLogin();
+    } else {
+        showToast(result.error || 'Erro ao criar conta', 'error');
+    }
+}
+
+function toggleToRegister() {
+    dom.forms.login.classList.add('hidden');
+    dom.forms.register.classList.remove('hidden');
+}
+
+function toggleToLogin() {
+    dom.forms.register.classList.add('hidden');
+    dom.forms.login.classList.remove('hidden');
 }
 
 function loginSuccess(profile) {
@@ -701,7 +727,18 @@ function showToast(message, type = 'default') {
 // --- Event Listeners ---
 function setupEventListeners() {
     dom.forms.login.addEventListener('submit', handleLogin);
+    dom.forms.register.addEventListener('submit', handleSignUpSubmit);
     dom.forms.ticket.addEventListener('submit', handleSubmitTicket);
+
+    document.getElementById('toggle-register').addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleToRegister();
+    });
+    document.getElementById('toggle-login').addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleToLogin();
+    });
+
     document.getElementById('forgot-password-form').addEventListener('submit', handleRecoverySubmit);
     document.getElementById('external-reset-form').addEventListener('submit', handleExternalResetSubmit);
 
