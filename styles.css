@@ -690,3 +690,16 @@ textarea:focus {
     width: auto;
     /* reset generic input width */
 }
+
+/* Forgot Password Link */
+.forgot-link {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.forgot-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}

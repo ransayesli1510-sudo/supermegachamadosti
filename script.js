@@ -55,6 +55,8 @@ const views = {
     home: ['hero', 'benefits'],
     createTicket: ['ticket-form'],
     login: ['login'],
+    forgotPassword: ['forgot-password'],
+    resetPasswordExternal: ['reset-password-external'],
     dashboard: ['dashboard']
 };
 
@@ -446,6 +448,93 @@ function updateUserPassword(index, newPass) {
 
 // Remove old mailto logic
 function performReset(target) { }
+
+// --- Forgot Password / External Reset Logic ---
+let recoveryEmailTemp = null; // Store email during the flow
+
+function handleRecoverySubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('recovery-email').value.trim();
+
+    // 1. Check if user exists
+    // Resolve Alias: 'admin' maps to the Ransay account just in case they try to recover 'admin'
+    let targetEmail = email;
+    if (email.toLowerCase() === 'admin') {
+        targetEmail = 'ransay@supermegavendas.com';
+    }
+
+    const userExists = store.users.find(u => u.email === targetEmail);
+
+    if (userExists) {
+        // Simulate sending email
+        const btn = e.target.querySelector('button');
+        const originalText = btn.textContent;
+        btn.textContent = 'Enviando...';
+        btn.disabled = true;
+
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+
+            // In a real app, this would send an email. 
+            // Here we simulate the "Link" arrival via a confirm dialog or just a toast that guides them.
+            // Let's use a nice Toast and then simulated "Click" behavior.
+
+            showToast('Link de redefinição enviado para o e-mail!', 'success');
+
+            // SIMULATION: Navigate to reset page after a delay, as if they clicked the link
+            setTimeout(() => {
+                const confirmed = confirm(`[SIMULAÇÃO DE E-MAIL]\n\nOlá, ${userExists.username}.\n\nRecebemos um pedido para redefinir sua senha.\nClique em OK para redefinir agora.`);
+                if (confirmed) {
+                    recoveryEmailTemp = targetEmail;
+                    showSection('reset-password-external');
+                }
+            }, 1000);
+
+        }, 1500);
+    } else {
+        // Security best practice: Don't reveal if user exists or not, OR strictly say "If this email exists..."
+        // But for this internal tool/demo, let's be helpful.
+        showToast('E-mail não encontrado.', 'error');
+    }
+}
+
+function handleExternalResetSubmit(e) {
+    e.preventDefault();
+    const newPass = document.getElementById('ext-new-password').value;
+    const confirmPass = document.getElementById('ext-confirm-password').value;
+
+    if (!recoveryEmailTemp) {
+        showToast('Sessão expirada. Comece novamente.', 'error');
+        showSection('forgot-password');
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        showToast('As senhas não coincidem.', 'error');
+        return;
+    }
+
+    if (!newPass || newPass.length < 3) {
+        showToast('Senha muito curta.', 'error');
+        return;
+    }
+
+    // Find User
+    const userIndex = store.users.findIndex(u => u.email === recoveryEmailTemp);
+    if (userIndex > -1) {
+        // Update Password
+        store.users[userIndex].password = newPass;
+        saveUsers();
+
+        showToast('Senha redefinida com sucesso! Faça login.', 'success');
+        recoveryEmailTemp = null; // Clear
+        document.getElementById('external-reset-form').reset();
+        showSection('login');
+    } else {
+        showToast('Erro ao atualizar senha.', 'error');
+    }
+}
 
 // --- Utilities ---
 function showToast(message, type = 'default') {

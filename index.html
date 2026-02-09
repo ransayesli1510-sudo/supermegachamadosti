@@ -181,9 +181,63 @@
                             </div>
                         </div>
                         <div class="form-footer">
-                            <small class="hint">Dica: ransay@supermegavendas.com / admin123</small>
+                            <a href="#" onclick="showSection('forgot-password'); return false;"
+                                class="forgot-link">Esqueci minha senha?</a>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Forgot Password Section -->
+        <section id="forgot-password" class="section-page hidden">
+            <div class="container">
+                <button class="btn-back" onclick="showSection('login')"><i class="ph ph-arrow-left"></i> Voltar</button>
+                <div class="login-wrapper glass-panel">
+                    <div class="login-header">
+                        <h2>Recuperar Senha</h2>
+                        <p>Informe seu e-mail para receber o link de redefinição.</p>
+                    </div>
+                    <form id="forgot-password-form" onsubmit="handleRecoverySubmit(event)">
+                        <div class="form-group">
+                            <label for="recovery-email">E-mail Cadastrado</label>
+                            <div class="input-icon">
+                                <i class="ph ph-envelope"></i>
+                                <input type="email" id="recovery-email" required placeholder="seu.email@empresa.com">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Enviar Link</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- External Reset Password Section -->
+        <section id="reset-password-external" class="section-page hidden">
+            <div class="container">
+                <div class="login-wrapper glass-panel">
+                    <div class="login-header">
+                        <h2>Redefinir Senha</h2>
+                        <p>Crie uma nova senha para sua conta.</p>
+                    </div>
+                    <form id="external-reset-form" onsubmit="handleExternalResetSubmit(event)">
+                        <div class="form-group">
+                            <label for="ext-new-password">Nova Senha</label>
+                            <div class="input-icon">
+                                <i class="ph ph-lock-key"></i>
+                                <input type="password" id="ext-new-password" required placeholder="Nova senha">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ext-confirm-password">Confirmar Senha</label>
+                            <div class="input-icon">
+                                <i class="ph ph-lock-key"></i>
+                                <input type="password" id="ext-confirm-password" required
+                                    placeholder="Confirme a senha">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Redefinir Senha</button>
                     </form>
                 </div>
             </div>
