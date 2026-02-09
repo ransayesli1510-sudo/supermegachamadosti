@@ -17,10 +17,11 @@ let dbFileSha = null; // To handle updates
 
 async function fetchDB() {
     if (githubConfig.token === "YOUR_GITHUB_PAT") {
-        console.warn("GitHub PAT not configured.");
+        console.warn("❌ GitHub PAT not configured.");
         return null;
     }
 
+    console.log("🔄 Fetching data from GitHub...");
     // Add timestamp to bypass cache
     const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
     try {
@@ -31,16 +32,21 @@ async function fetchDB() {
             }
         });
 
-        if (!response.ok) throw new Error(`GitHub API Error: ${response.statusText}`);
+        if (!response.ok) {
+            console.error(`❌ GitHub API Error: ${response.status} ${response.statusText}`);
+            throw new Error(`GitHub API Error: ${response.statusText}`);
+        }
 
         const data = await response.json();
         dbFileSha = data.sha; // Save SHA for future updates
 
         // Decode Content (Base64 -> UTF-8)
         const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
-        return JSON.parse(decodedContent);
+        const parsed = JSON.parse(decodedContent);
+        console.log(`✅ Data loaded from GitHub: ${parsed.tickets?.length || 0} tickets, ${parsed.users?.length || 0} users`);
+        return parsed;
     } catch (error) {
-        console.error("Error fetching DB from GitHub:", error);
+        console.error("❌ Error fetching DB from GitHub:", error);
         return null;
     }
 }
