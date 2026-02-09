@@ -21,7 +21,8 @@ async function fetchDB() {
         return null;
     }
 
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
+    // Add timestamp to bypass cache
+    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
     try {
         const response = await fetch(url, {
             headers: {
@@ -47,10 +48,23 @@ async function fetchDB() {
 async function saveDB(newData) {
     if (githubConfig.token === "YOUR_GITHUB_PAT") {
         showToast("Configure o Token do GitHub no script.js!", "error");
-        return;
+        return false;
     }
 
     const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
+
+    // 1. Fetch latest SHA first to avoid 409 Conflict
+    try {
+        const checkResponse = await fetch(url + `?t=${Date.now()}`, {
+            headers: { 'Authorization': `token ${githubConfig.token}` }
+        });
+        if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            dbFileSha = checkData.sha;
+        }
+    } catch (e) {
+        console.warn("Could not fetch latest SHA, trying with cached...", e);
+    }
 
     // Encode Content (UTF-8 -> Base64)
     const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
@@ -84,7 +98,7 @@ async function saveDB(newData) {
         return true;
     } catch (error) {
         console.error("Error saving DB to GitHub:", error);
-        showToast("Erro ao salvar no GitHub (Conflito ou Permissão)", "error");
+        showToast("Erro ao salvar no GitHub: " + error.message, "error");
         return false;
     }
 }
@@ -115,8 +129,11 @@ async function startPolling() {
 }
 
 async function loadData(silent = false) {
+    if (!silent) updateStatus('syncing');
+
     const data = await fetchDB();
     if (data) {
+        updateStatus('connected');
         // Simple merge/overwrite for now
         store.tickets = data.tickets || [];
         store.users = data.users || [];
@@ -128,6 +145,7 @@ async function loadData(silent = false) {
             renderDashboard();
         }
     } else {
+        updateStatus('error');
         if (!silent) console.log("Using empty/local data or fetch failed.");
         // Initial fallbacks if empty
         if (store.users.length === 0) {
@@ -137,6 +155,23 @@ async function loadData(silent = false) {
                 { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
             ];
         }
+    }
+}
+
+function updateStatus(state) {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    if (!dot || !text) return;
+
+    if (state === 'connected') {
+        dot.className = 'status-dot status-connected';
+        text.textContent = 'Conectado (Git)';
+    } else if (state === 'error') {
+        dot.className = 'status-dot status-error';
+        text.textContent = 'Erro Conexão';
+    } else if (state === 'syncing') {
+        dot.className = 'status-dot status-syncing';
+        text.textContent = 'Sincronizando...';
     }
 }
 
