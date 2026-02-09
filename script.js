@@ -3,51 +3,158 @@
  * Handles state, routing, and simulated backend operations.
  */
 
-// --- State Management ---
+// --- GitHub as Database Configuration ---
+const githubConfig = {
+    username: "ransayesli1510-sudo", // Replace with your GitHub Username
+    repo: "supermegachamadosti",     // Replace with your Repository Name
+    token: "YOUR_GITHUB_PAT",        // Replace with your Personal Access Token
+    branch: "main",
+    path: "db.json"
+};
+
+// --- GitHub API Helpers ---
+let dbFileSha = null; // To handle updates
+
+async function fetchDB() {
+    if (githubConfig.token === "YOUR_GITHUB_PAT") {
+        console.warn("GitHub PAT not configured.");
+        return null;
+    }
+
+    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) throw new Error(`GitHub API Error: ${response.statusText}`);
+
+        const data = await response.json();
+        dbFileSha = data.sha; // Save SHA for future updates
+
+        // Decode Content (Base64 -> UTF-8)
+        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
+        return JSON.parse(decodedContent);
+    } catch (error) {
+        console.error("Error fetching DB from GitHub:", error);
+        return null;
+    }
+}
+
+async function saveDB(newData) {
+    if (githubConfig.token === "YOUR_GITHUB_PAT") {
+        showToast("Configure o Token do GitHub no script.js!", "error");
+        return;
+    }
+
+    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
+
+    // Encode Content (UTF-8 -> Base64)
+    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
+
+    const body = {
+        message: "Update database via App",
+        content: contentEncoded,
+        sha: dbFileSha, // Required to update existing file
+        branch: githubConfig.branch
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${githubConfig.token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || response.statusText);
+        }
+
+        const data = await response.json();
+        dbFileSha = data.content.sha; // Update SHA for next write
+        console.log("Database saved to GitHub");
+        return true;
+    } catch (error) {
+        console.error("Error saving DB to GitHub:", error);
+        showToast("Erro ao salvar no GitHub (Conflito ou Permissão)", "error");
+        return false;
+    }
+}
+
+
 // --- State Management ---
 const store = {
     view: 'home',
     user: null, // null, { username, role, email }
-    tickets: JSON.parse(localStorage.getItem('tickets')) || [],
-    users: loadUsersSafe()
+    tickets: [],
+    users: []
 };
 
-function loadUsersSafe() {
-    try {
-        const u = JSON.parse(localStorage.getItem('users'));
-        return Array.isArray(u) ? u : [];
-    } catch (e) {
-        console.error("Error loading users", e);
-        return [];
+
+// Polling for Updates
+let isPolling = false;
+async function startPolling() {
+    if (isPolling) return;
+    isPolling = true;
+
+    // Initial Load
+    await loadData();
+
+    // Poll every 10 seconds
+    setInterval(async () => {
+        await loadData(true); // Silent update
+    }, 10000);
+}
+
+async function loadData(silent = false) {
+    const data = await fetchDB();
+    if (data) {
+        // Simple merge/overwrite for now
+        store.tickets = data.tickets || [];
+        store.users = data.users || [];
+
+        if (!silent) console.log("Data loaded from GitHub");
+
+        // Update UI if on dashboard
+        if (store.view === 'dashboard' && store.user) {
+            renderDashboard();
+        }
+    } else {
+        if (!silent) console.log("Using empty/local data or fetch failed.");
+        // Initial fallbacks if empty
+        if (store.users.length === 0) {
+            store.users = [
+                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
+                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
+                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
+            ];
+        }
     }
 }
 
 // --- Initialization ---
 function init() {
-    initUsers(); // Seed users if empty
+    startPolling();
     setupEventListeners();
     checkAuthSession();
     updateUI();
 }
 
-function initUsers() {
-    if (store.users.length === 0) {
-        seedDefaultUsers();
-    }
-}
-
-function seedDefaultUsers() {
-    const seedUsers = [
-        { email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
-        { email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
-        { email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
-    ];
-    store.users = seedUsers;
-    saveUsers();
-}
-
-function saveUsers() {
-    localStorage.setItem('users', JSON.stringify(store.users));
+// Helper to save entire store to DB
+async function persistStore() {
+    const data = {
+        tickets: store.tickets,
+        users: store.users
+    };
+    return await saveDB(data);
 }
 
 // --- DOM Elements ---
@@ -120,13 +227,6 @@ function handleLogin(e) {
 
     // 1. Find User
     let user = store.users.find(u => u.email === targetEmail);
-
-    // Self-Healing
-    if (!user && targetEmail === 'ransay@supermegavendas.com') {
-        console.warn("User database corrupted/empty. Re-seeding defaults.");
-        seedDefaultUsers();
-        user = store.users.find(u => u.email === targetEmail);
-    }
 
     // 2. Validate Credentials
     if (user) {
@@ -208,8 +308,17 @@ function handleSubmitTicket(e) {
             attachment: document.getElementById('attachment').files[0] ? document.getElementById('attachment').files[0].name : null
         };
 
-        store.tickets.unshift(formData); // Add to beginning
-        saveTickets();
+        // Optimistic UI Update first
+        store.tickets.unshift(formData);
+
+        // Save to Git
+        persistStore().then(success => {
+            if (success) {
+                showToast('Chamado salvo no GitHub!', 'success');
+            } else {
+                showToast('Chamado salvo localmente (Erro no Git).', 'warning');
+            }
+        });
 
         btn.textContent = originalText;
         btn.disabled = false;
@@ -228,10 +337,6 @@ function handleSubmitTicket(e) {
     }, 1000); // Fake delay
 }
 
-function saveTickets() {
-    localStorage.setItem('tickets', JSON.stringify(store.tickets));
-}
-
 // --- Dashboard Logic ---
 function renderDashboard() {
     if (!store.user) return;
@@ -245,17 +350,9 @@ function renderDashboard() {
     dom.adminStats.innerHTML = '';
 
     // Filter tickets based on role
-    // User sees only their tickets (simulated by checking if they created it OR simple filter for demo)
-    // For this demo: 'user' sees tickets created by 'Visitante' OR 'Usuário' just to show content, 
-    // OR strictly only their own. Let's make 'user' see tickets they "own" (mocked ownership).
-    // To make it simple: Admin sees ALL. User sees tickets where 'byUser' is 'Usuário' or match email?
-    // Let's keep it simple: Admin sees all. User sees a subset.
-
     let displayTickets = store.tickets;
     if (store.user.role !== 'admin') {
-        // Mock filtering: In real app, check ID. Here, filter by context.
-        // Let's show all for demo if user, or filter if we want strictness.
-        // Let's filter: User sees only "Usuário" created tickets.
+        // User sees only "Usuário" created tickets.
         displayTickets = store.tickets.filter(t => t.byUser === 'Usuário');
     }
 
@@ -334,7 +431,7 @@ window.updateTicketStatus = function (ticketId, newStatus) {
     const ticketIndex = store.tickets.findIndex(t => t.id === ticketId);
     if (ticketIndex > -1) {
         store.tickets[ticketIndex].status = newStatus;
-        saveTickets();
+        persistStore(); // Save to Git
         renderDashboard();
         showToast(`Status atualizado para ${newStatus}`, 'success');
     }
@@ -440,7 +537,7 @@ function handleResetSubmit(e) {
 
 function updateUserPassword(index, newPass) {
     store.users[index].password = newPass;
-    saveUsers();
+    persistStore();
 
     showToast('Senha alterada com sucesso!', 'success');
     closeResetModal();
@@ -476,10 +573,6 @@ function handleRecoverySubmit(e) {
             btn.textContent = originalText;
             btn.disabled = false;
 
-            // In a real app, this would send an email. 
-            // Here we simulate the "Link" arrival via a confirm dialog or just a toast that guides them.
-            // Let's use a nice Toast and then simulated "Click" behavior.
-
             showToast('Link de redefinição enviado para o e-mail!', 'success');
 
             // SIMULATION: Navigate to reset page after a delay, as if they clicked the link
@@ -493,8 +586,6 @@ function handleRecoverySubmit(e) {
 
         }, 1500);
     } else {
-        // Security best practice: Don't reveal if user exists or not, OR strictly say "If this email exists..."
-        // But for this internal tool/demo, let's be helpful.
         showToast('E-mail não encontrado.', 'error');
     }
 }
@@ -525,7 +616,7 @@ function handleExternalResetSubmit(e) {
     if (userIndex > -1) {
         // Update Password
         store.users[userIndex].password = newPass;
-        saveUsers();
+        persistStore(); // Save to Git
 
         showToast('Senha redefinida com sucesso! Faça login.', 'success');
         recoveryEmailTemp = null; // Clear
@@ -560,6 +651,8 @@ function showToast(message, type = 'default') {
 function setupEventListeners() {
     dom.forms.login.addEventListener('submit', handleLogin);
     dom.forms.ticket.addEventListener('submit', handleSubmitTicket);
+    document.getElementById('forgot-password-form').addEventListener('submit', handleRecoverySubmit);
+    document.getElementById('external-reset-form').addEventListener('submit', handleExternalResetSubmit);
 
     document.getElementById('nav-login-btn').addEventListener('click', () => showSection('login'));
     document.getElementById('nav-logout-btn').addEventListener('click', handleLogout);

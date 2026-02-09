@@ -1,0 +1,26 @@
+{
+  "tickets": [],
+  "users": [
+    {
+      "id": "1",
+      "username": "Ransay (Gestor)",
+      "email": "ransay@supermegavendas.com",
+      "password": "admin123",
+      "role": "admin"
+    },
+    {
+      "id": "2",
+      "username": "Usuário",
+      "email": "user",
+      "password": "user123",
+      "role": "user"
+    },
+    {
+      "id": "3",
+      "username": "Usuário Padrão",
+      "email": "user@email.com",
+      "password": "user123",
+      "role": "user"
+    }
+  ]
+}
