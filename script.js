@@ -92,112 +92,11 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- GitHub as Database Configuration ---
-const githubConfig = {
-    username: "ransayesli1510-sudo",
-    repo: "supermegachamadosti",
-    token: "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",
-    branch: "main",
-    path: "db.json"
-};
+// --- Supabase initialization is handled in supabase-config.js ---
 
-// --- GitHub API Helpers ---
-let dbFileSha = null; // To handle updates
 
-async function fetchDB() {
-    if (githubConfig.token === "YOUR_GITHUB_PAT") {
-        ErrorLogger.warn("GitHub PAT not configured");
-        return null;
-    }
+// GitHub functions removed in favor of Supabase helper functions in supabase-db.js
 
-    ErrorLogger.info("Fetching data from GitHub...");
-    // Add timestamp to bypass cache
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `token ${githubConfig.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
-
-        if (!response.ok) {
-            const errorMsg = `GitHub API Error: ${response.status} ${response.statusText}`;
-            ErrorLogger.error(errorMsg, new Error(errorMsg));
-            throw new Error(errorMsg);
-        }
-
-        const data = await response.json();
-        dbFileSha = data.sha; // Save SHA for future updates
-
-        // Decode Content (Base64 -> UTF-8)
-        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
-        const parsed = JSON.parse(decodedContent);
-        ErrorLogger.success(`Data loaded from GitHub: ${parsed.tickets?.length || 0} tickets, ${parsed.users?.length || 0} users`);
-        return parsed;
-    } catch (error) {
-        ErrorLogger.error("Failed to fetch database from GitHub", error);
-        return null;
-    }
-}
-
-async function saveDB(newData) {
-    if (githubConfig.token === "YOUR_GITHUB_PAT") {
-        showToast("Configure o Token do GitHub no script.js!", "error");
-        return false;
-    }
-
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
-
-    // 1. Fetch latest SHA first to avoid 409 Conflict
-    try {
-        const checkResponse = await fetch(url + `?t=${Date.now()}`, {
-            headers: { 'Authorization': `token ${githubConfig.token}` }
-        });
-        if (checkResponse.ok) {
-            const checkData = await checkResponse.json();
-            dbFileSha = checkData.sha;
-        }
-    } catch (e) {
-        console.warn("Could not fetch latest SHA, trying with cached...", e);
-    }
-
-    // Encode Content (UTF-8 -> Base64)
-    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
-
-    const body = {
-        message: "Update database via App",
-        content: contentEncoded,
-        sha: dbFileSha, // Required to update existing file
-        branch: githubConfig.branch
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${githubConfig.token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.message || response.statusText);
-        }
-
-        const data = await response.json();
-        dbFileSha = data.content.sha; // Update SHA for next write
-        console.log("Database saved to GitHub");
-        return true;
-    } catch (error) {
-        console.error("Error saving DB to GitHub:", error);
-        showToast("Erro ao salvar no GitHub: " + error.message, "error");
-        return false;
-    }
-}
 
 
 // --- State Management ---
@@ -209,32 +108,29 @@ const store = {
 };
 
 
-// Polling for Updates
-let isPolling = false;
-async function startPolling() {
-    if (isPolling) return;
-    isPolling = true;
+// Subscriptions for Updates
+let ticketSubscription = null;
+async function startRealtimeSync() {
+    if (ticketSubscription) return;
 
     // Initial Load
     await loadData();
 
-    // Poll every 10 seconds
-    setInterval(async () => {
-        await loadData(true); // Silent update
-    }, 10000);
+    // Subscribe to changes (Real-time instead of polling)
+    ticketSubscription = subscribeToTickets(() => {
+        loadData(true); // Silent update when database changes
+    });
 }
 
 async function loadData(silent = false) {
     if (!silent) updateStatus('syncing');
 
-    const data = await fetchDB();
-    if (data) {
+    const result = await getTickets();
+    if (result.success) {
         updateStatus('connected');
-        // Simple merge/overwrite for now
-        store.tickets = data.tickets || [];
-        store.users = data.users || [];
+        store.tickets = result.tickets || [];
 
-        if (!silent) console.log("Data loaded from GitHub");
+        if (!silent) ErrorLogger.info("Dados carregados do Supabase");
 
         // Update UI if on dashboard
         if (store.view === 'dashboard' && store.user) {
@@ -242,15 +138,15 @@ async function loadData(silent = false) {
         }
     } else {
         updateStatus('error');
-        if (!silent) console.log("Using empty/local data or fetch failed.");
-        // Initial fallbacks if empty
-        if (store.users.length === 0) {
-            store.users = [
-                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
-                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
-                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
-            ];
-        }
+        if (!silent) ErrorLogger.warn("Falha ao carregar dados do Supabase.");
+    }
+    // Initial fallbacks if empty (users are not fetched via getTickets, so keep this fallback)
+    if (store.users.length === 0) {
+        store.users = [
+            { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
+            { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
+            { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
+        ];
     }
 }
 
@@ -261,7 +157,7 @@ function updateStatus(state) {
 
     if (state === 'connected') {
         dot.className = 'status-dot status-connected';
-        text.textContent = 'Conectado (Git)';
+        text.textContent = 'Conectado (Supabase)';
     } else if (state === 'error') {
         dot.className = 'status-dot status-error';
         text.textContent = 'Erro Conexão';
@@ -316,7 +212,10 @@ function createStatusUI() {
 // --- Initialization ---
 function init() {
     createStatusUI();
-    startPolling();
+    const isSupabaseReady = initSupabase();
+    if (isSupabaseReady) {
+        startRealtimeSync();
+    }
     setupEventListeners();
     checkAuthSession();
     updateUI();
@@ -380,53 +279,43 @@ function showHome() {
 }
 
 // --- Authentication ---
-function checkAuthSession() {
-    const sessionUser = localStorage.getItem('currentUser');
-    if (sessionUser) {
-        store.user = JSON.parse(sessionUser);
-    }
-    updateNav();
-}
-
-function handleLogin(e) {
-    e.preventDefault();
-    const usernameInput = e.target.username.value.trim();
-    const passwordInput = e.target.password.value;
-
-    // Resolve Alias: 'admin' maps to the Ransay account
-    let targetEmail = usernameInput;
-    if (usernameInput.toLowerCase() === 'admin') {
-        targetEmail = 'ransay@supermegavendas.com';
-    }
-
-    // 1. Find User
-    let user = store.users.find(u => u.email === targetEmail);
-
-    // 2. Validate Credentials
-    if (user) {
-        if (user.password === passwordInput) {
-            loginSuccess(user);
-        } else {
-            showToast('senha incorreta', 'error');
+async function checkAuthSession() {
+    const result = await getCurrentUser();
+    if (result) {
+        store.user = result.profile;
+        // If on dashboard, load data
+        if (store.view === 'dashboard') {
+            await loadData();
         }
+    }
+    updateNav();
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
+    const result = await signIn(email, password);
+    if (result.success) {
+        loginSuccess(result.profile); // Profile contains role
     } else {
-        showToast('Usuário não encontrado.', 'error');
+        showToast(result.error || 'Erro ao fazer login', 'error');
     }
 }
 
-function loginSuccess(user) {
-    store.user = user;
-    localStorage.setItem('currentUser', JSON.stringify(user));
+function loginSuccess(profile) {
+    store.user = profile;
     dom.forms.login.reset();
-    showToast(`Bem-vindo, ${user.username}!`, 'success');
+    showToast(`Bem-vindo, ${profile.full_name}!`, 'success');
     updateNav();
-    renderDashboard();
     showSection('dashboard');
+    loadData(); // Fetch tickets for the logged in user
 }
 
-function handleLogout() {
+async function handleLogout() {
+    await signOut();
     store.user = null;
-    localStorage.removeItem('currentUser');
     updateNav();
     showHome();
     showToast('Você saiu do sistema.');
@@ -459,56 +348,41 @@ function scheduleConsultation() {
 
 
 // --- Ticket Management ---
-function handleSubmitTicket(e) {
+async function handleSubmitTicket(e) {
     e.preventDefault();
 
-    // Simulate loading
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
     btn.textContent = 'Enviando...';
     btn.disabled = true;
 
-    setTimeout(() => {
-        const formData = {
-            id: '#' + Math.floor(1000 + Math.random() * 9000),
-            name: e.target.name.value,
-            email: e.target.email.value,
-            department: e.target.department.value,
-            category: e.target.category.value,
-            description: e.target.description.value,
-            status: 'Aberto', // Aberto, Em atendimento, Resolvido
-            date: new Date().toLocaleDateString('pt-BR'),
-            byUser: store.user ? store.user.username : 'Visitante',
-            attachment: document.getElementById('attachment').files[0] ? document.getElementById('attachment').files[0].name : null
-        };
+    const formData = {
+        name: e.target.name.value,
+        email: e.target.email.value,
+        department: e.target.department.value,
+        category: e.target.category.value,
+        description: e.target.description.value,
+        attachment: document.getElementById('attachment').files[0] ? document.getElementById('attachment').files[0].name : null
+    };
 
-        // Optimistic UI Update first
-        store.tickets.unshift(formData);
+    const result = await createTicket(formData);
 
-        // Save to Git
-        persistStore().then(success => {
-            if (success) {
-                showToast('Chamado salvo no GitHub!', 'success');
-            } else {
-                showToast('Chamado salvo localmente (Erro no Git).', 'warning');
-            }
-        });
+    btn.textContent = originalText;
+    btn.disabled = false;
 
-        btn.textContent = originalText;
-        btn.disabled = false;
+    if (result.success) {
+        showToast('Chamado enviado com sucesso!', 'success');
         e.target.reset();
 
-        // Feedback
-        showToast('Chamado aberto com sucesso!', 'success');
-
-        // Redirect logic
         if (store.user) {
-            renderDashboard();
+            await loadData();
             showSection('dashboard');
         } else {
             showHome();
         }
-    }, 1000); // Fake delay
+    } else {
+        showToast('Erro ao enviar chamado. Tente novamente.', 'error');
+    }
 }
 
 // --- Dashboard Logic ---
@@ -568,17 +442,20 @@ function renderDashboard() {
         dom.emptyState.classList.add('hidden');
         displayTickets.forEach(ticket => {
             const tr = document.createElement('tr');
+            const dateStr = new Date(ticket.created_at).toLocaleDateString('pt-BR');
+            const creatorName = ticket.created_by_profile ? ticket.created_by_profile.full_name : 'Anônimo';
+
             tr.innerHTML = `
-                <td><strong>${ticket.id}</strong></td>
+                <td><strong>#${ticket.id.substring(0, 4)}</strong></td>
                 <td>
-                    <div>${ticket.category} ${ticket.attachment ? '<i class="ph ph-paperclip" title="Anexo: ' + ticket.attachment + '"></i>' : ''}</div>
+                    <div>${ticket.category} ${ticket.attachment_url ? '<i class="ph ph-paperclip" title="Anexo: ' + ticket.attachment_url + '"></i>' : ''}</div>
                     <small style="color:var(--text-muted)">${ticket.description.substring(0, 30)}...</small>
                 </td>
                 <td>
-                    <div>${ticket.name}</div>
-                    <small style="color:var(--text-muted)">${ticket.department}</small>
+                    <div>${creatorName}</div>
+                    <small style="color:var(--text-muted)">${ticket.department || 'N/A'}</small>
                 </td>
-                <td>${ticket.date}</td>
+                <td>${dateStr}</td>
                 <td><span class="status-badge ${ticket.status.toLowerCase().replace(' ', '-')}">${ticket.status}</span></td>
                 <td class="actions-col">
                     ${store.user.role === 'admin' ? getAdminActions(ticket.id) : '<button class="btn-outline btn-sm" disabled>Ver</button>'}

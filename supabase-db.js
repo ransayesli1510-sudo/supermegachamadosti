@@ -106,19 +106,24 @@ async function getCurrentUser() {
 async function createTicket(ticketData) {
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Usuário não autenticado');
+
+        const payload = {
+            title: ticketData.category,
+            description: ticketData.description,
+            category: ticketData.category,
+            department: ticketData.department,
+            status: 'open',
+            attachment_url: ticketData.attachment || null
+        };
+
+        // If user is logged in, associate the ticket
+        if (user) {
+            payload.created_by = user.id;
+        }
 
         const { data, error } = await supabase
             .from('tickets')
-            .insert([{
-                title: ticketData.category,
-                description: ticketData.description,
-                category: ticketData.category,
-                department: ticketData.department,
-                status: 'open',
-                created_by: user.id,
-                attachment_url: ticketData.attachment || null
-            }])
+            .insert([payload])
             .select()
             .single();
 
@@ -135,14 +140,6 @@ async function createTicket(ticketData) {
 async function getTickets() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Usuário não autenticado');
-
-        // Get user profile to check role
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
 
         let query = supabase
             .from('tickets')
@@ -152,9 +149,23 @@ async function getTickets() {
             `)
             .order('created_at', { ascending: false });
 
-        // If not admin, only show own tickets
-        if (profile.role !== 'admin') {
-            query = query.eq('created_by', user.id);
+        if (user) {
+            // Get user profile to check role
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            // If not admin, show own tickets (including ones created while logged out if possible - though usually we only show own)
+            // Actually, if logged in and NOT admin, filter by created_by
+            if (profile && profile.role !== 'admin') {
+                query = query.eq('created_by', user.id);
+            }
+        } else {
+            // If NOT logged in, we return nothing or an error since public can't view tickets
+            ErrorLogger.warn('Acesso negado: faça login para ver chamados');
+            return { success: false, error: 'Não autenticado' };
         }
 
         const { data, error } = await query;
