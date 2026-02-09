@@ -3,6 +3,95 @@
  * Handles state, routing, and simulated backend operations.
  */
 
+// --- Production Error Logging ---
+const ErrorLogger = {
+    logs: [],
+    maxLogs: 100,
+
+    log(level, message, error = null) {
+        const timestamp = new Date().toISOString();
+        const logEntry = {
+            timestamp,
+            level,
+            message,
+            error: error ? {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            } : null,
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
+
+        this.logs.push(logEntry);
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+
+        // Console output with emoji
+        const emoji = {
+            'error': '❌',
+            'warn': '⚠️',
+            'info': 'ℹ️',
+            'success': '✅'
+        };
+
+        console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](
+            `${emoji[level] || '📝'} [${timestamp}] ${message}`,
+            error || ''
+        );
+
+        // Show user-friendly toast for errors
+        if (level === 'error' && typeof showToast === 'function') {
+            showToast(message, 'error');
+        }
+    },
+
+    error(message, error) {
+        this.log('error', message, error);
+    },
+
+    warn(message, error) {
+        this.log('warn', message, error);
+    },
+
+    info(message) {
+        this.log('info', message);
+    },
+
+    success(message) {
+        this.log('success', message);
+    },
+
+    getLogs() {
+        return this.logs;
+    },
+
+    exportLogs() {
+        return JSON.stringify(this.logs, null, 2);
+    }
+};
+
+// Global error handlers
+window.addEventListener('error', (event) => {
+    ErrorLogger.error('Uncaught Error', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    ErrorLogger.error('Unhandled Promise Rejection', event.reason);
+});
+
+// Network status monitoring
+window.addEventListener('online', () => {
+    ErrorLogger.success('Conexão restaurada');
+    if (typeof updateStatus === 'function') updateStatus('connected');
+});
+
+window.addEventListener('offline', () => {
+    ErrorLogger.warn('Sem conexão com a internet');
+    if (typeof updateStatus === 'function') updateStatus('error');
+});
+
 // --- GitHub as Database Configuration ---
 const githubConfig = {
     username: "ransayesli1510-sudo",
@@ -17,11 +106,11 @@ let dbFileSha = null; // To handle updates
 
 async function fetchDB() {
     if (githubConfig.token === "YOUR_GITHUB_PAT") {
-        console.warn("❌ GitHub PAT not configured.");
+        ErrorLogger.warn("GitHub PAT not configured");
         return null;
     }
 
-    console.log("🔄 Fetching data from GitHub...");
+    ErrorLogger.info("Fetching data from GitHub...");
     // Add timestamp to bypass cache
     const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
     try {
@@ -33,8 +122,9 @@ async function fetchDB() {
         });
 
         if (!response.ok) {
-            console.error(`❌ GitHub API Error: ${response.status} ${response.statusText}`);
-            throw new Error(`GitHub API Error: ${response.statusText}`);
+            const errorMsg = `GitHub API Error: ${response.status} ${response.statusText}`;
+            ErrorLogger.error(errorMsg, new Error(errorMsg));
+            throw new Error(errorMsg);
         }
 
         const data = await response.json();
@@ -43,10 +133,10 @@ async function fetchDB() {
         // Decode Content (Base64 -> UTF-8)
         const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
         const parsed = JSON.parse(decodedContent);
-        console.log(`✅ Data loaded from GitHub: ${parsed.tickets?.length || 0} tickets, ${parsed.users?.length || 0} users`);
+        ErrorLogger.success(`Data loaded from GitHub: ${parsed.tickets?.length || 0} tickets, ${parsed.users?.length || 0} users`);
         return parsed;
     } catch (error) {
-        console.error("❌ Error fetching DB from GitHub:", error);
+        ErrorLogger.error("Failed to fetch database from GitHub", error);
         return null;
     }
 }
