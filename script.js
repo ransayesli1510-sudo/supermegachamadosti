@@ -175,8 +175,51 @@ function updateStatus(state) {
     }
 }
 
+function createStatusUI() {
+    // Add Styles
+    const style = document.createElement('style');
+    style.textContent = `
+        #connection-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-family: sans-serif;
+            transition: all 0.3s ease;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ccc;
+        }
+        .status-connected { background-color: #00e676; }
+        .status-error { background-color: #ff1744; }
+        .status-syncing { background-color: #2979ff; }
+    `;
+    document.head.appendChild(style);
+
+    // Add Element
+    const div = document.createElement('div');
+    div.id = 'connection-status';
+    div.innerHTML = `
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-text">Iniciando...</span>
+    `;
+    document.body.appendChild(div);
+}
+
 // --- Initialization ---
 function init() {
+    createStatusUI();
     startPolling();
     setupEventListeners();
     checkAuthSession();
