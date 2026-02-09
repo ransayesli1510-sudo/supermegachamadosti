@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY' // Your anon/public key
 // Initialize Supabase client (loaded via CDN in index.html)
 let supabase = null;
 
-// Initialize after DOM loads
+// Initialized after DOM loads
 function initSupabase() {
     if (typeof window.supabase === 'undefined') {
         ErrorLogger.error('Supabase SDK not loaded. Make sure to include the CDN script in index.html');
@@ -24,5 +24,4 @@ function initSupabase() {
     ErrorLogger.success('Supabase initialized successfully');
     return true;
 }
-
-export { supabase, initSupabase };
+// Variables 'supabase' and 'initSupabase' are now global.
