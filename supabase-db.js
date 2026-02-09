@@ -57,6 +57,13 @@ async function signIn(email, password) {
 
         if (profileError) throw profileError;
 
+        // Auto-promote specific admin email
+        if (profile.email === 'ransay@supermegavendas.com' && profile.role !== 'admin') {
+            profile.role = 'admin';
+            // Optionally update DB too, but we prioritize UI access first
+            await supabase.from('profiles').update({ role: 'admin' }).eq('id', profile.id);
+        }
+
         ErrorLogger.success('Login realizado com sucesso!');
         return { success: true, user: data.user, profile };
     } catch (error) {
@@ -93,6 +100,11 @@ async function getCurrentUser() {
             .single();
 
         if (profileError) throw profileError;
+
+        // Auto-promote specific admin email
+        if (profile.email === 'ransay@supermegavendas.com' && profile.role !== 'admin') {
+            profile.role = 'admin';
+        }
 
         return { user: session.user, profile };
     } catch (error) {
