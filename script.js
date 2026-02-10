@@ -96,7 +96,7 @@ window.addEventListener('offline', () => {
 const githubConfig = {
     username: "ransayesli1510-sudo",
     repo: "supermegachamadosti",
-    token: "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",
+    token: "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",
     branch: "main",
     path: "db.json"
 };
@@ -115,15 +115,20 @@ async function fetchDB() {
             }
         });
 
-        if (!response.ok) return null;
+        if (response.status === 401 || response.status === 403) {
+            throw new Error("AUTH_ERROR");
+        }
+
+        if (!response.ok) throw new Error("API_ERROR");
 
         const data = await response.json();
         dbFileSha = data.sha;
         const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
         return JSON.parse(decodedContent);
     } catch (error) {
+        if (error.message === "AUTH_ERROR") throw error;
         ErrorLogger.error("Erro ao ler banco do GitHub", error);
-        return null;
+        throw error;
     }
 }
 
@@ -138,8 +143,12 @@ async function saveDB(newData) {
         if (check.ok) {
             const checkData = await check.json();
             dbFileSha = checkData.sha;
+        } else if (check.status === 401 || check.status === 403) {
+            throw new Error("AUTH_ERROR");
         }
-    } catch (e) { }
+    } catch (e) {
+        if (e.message === "AUTH_ERROR") return false; // Early exit on auth fail
+    }
 
     const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
     const body = {
@@ -158,6 +167,10 @@ async function saveDB(newData) {
             },
             body: JSON.stringify(body)
         });
+
+        if (response.status === 401 || response.status === 403) {
+            throw new Error("AUTH_ERROR");
+        }
 
         if (response.ok) {
             const data = await response.json();
@@ -193,25 +206,32 @@ async function startPolling() {
 async function loadData(silent = false) {
     if (!silent) updateStatus('syncing');
 
-    const data = await fetchDB();
-    if (data) {
-        updateStatus('connected');
-        store.tickets = data.tickets || [];
-        store.users = data.users || [];
+    try {
+        const data = await fetchDB();
+        if (data) {
+            updateStatus('connected');
+            store.tickets = data.tickets || [];
+            store.users = data.users || [];
 
-        if (store.view === 'dashboard' && store.user) {
-            renderDashboard();
+            if (store.view === 'dashboard' && store.user) {
+                renderDashboard();
+            }
         }
-    } else {
-        updateStatus('error');
-    }
-    // Initial fallbacks if empty (users are not fetched via getTickets, so keep this fallback)
-    if (store.users.length === 0) {
-        store.users = [
-            { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
-            { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
-            { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
-        ];
+    } catch (error) {
+        if (error.message === "AUTH_ERROR") {
+            updateStatus('auth_error');
+        } else {
+            updateStatus('error');
+        }
+
+        // Initial fallbacks if empty (only on first load fail)
+        if (store.users.length === 0) {
+            store.users = [
+                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
+                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
+                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
+            ];
+        }
     }
 }
 
@@ -226,6 +246,9 @@ function updateStatus(state) {
     } else if (state === 'error') {
         dot.className = 'status-dot status-error';
         text.textContent = 'Erro Conexão';
+    } else if (state === 'auth_error') {
+        dot.className = 'status-dot status-auth-error';
+        text.textContent = 'Erro Autenticação (Token)';
     } else if (state === 'syncing') {
         dot.className = 'status-dot status-syncing';
         text.textContent = 'Sincronizando...';
@@ -260,6 +283,7 @@ function createStatusUI() {
         }
         .status-connected { background-color: #00e676; }
         .status-error { background-color: #ff1744; }
+        .status-auth-error { background-color: #aa00ff; }
         .status-syncing { background-color: #2979ff; }
     `;
     document.head.appendChild(style);
