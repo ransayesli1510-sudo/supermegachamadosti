@@ -193,18 +193,25 @@ async function loadData(silent = false) {
         }
     } catch (error) {
         updateStatus('error');
+        ErrorLogger.error("Erro ao carregar dados", error);
+    }
 
-        // Always ensure the admin user exists locally even if cloud fails
-        const adminEmail = 'ransay@supermegavendas.com';
-        if (store.users.findIndex(u => u.email.toLowerCase() === adminEmail) === -1) {
-            store.users.push({
-                id: 'u_ransay',
-                email: adminEmail,
-                password: 'admin',
-                username: 'Ransay (Gestor)',
-                role: 'admin',
-                full_name: 'Ransay (Gestor)'
-            });
+    // --- Critical: Always ensure the admin user exists in the system ---
+    const adminEmail = 'ransay@supermegavendas.com'.toLowerCase();
+    const adminExists = store.users.some(u => u.email.toLowerCase() === adminEmail);
+
+    if (!adminExists) {
+        ErrorLogger.info("Semeando usuário administrador...");
+        store.users.push({
+            id: 'u_ransay',
+            email: adminEmail,
+            password: 'admin',
+            username: 'Ransay (Gestor)',
+            role: 'admin',
+            full_name: 'Ransay (Gestor)'
+        });
+        // If we have a cloud connection, save the newly seeded admin
+        if (CLOUD_URL) {
             persistStore();
         }
     }
