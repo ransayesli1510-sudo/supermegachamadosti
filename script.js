@@ -92,40 +92,46 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// Cloud Sync Logic will use Pantry to avoid token revocation issues
+// --- Cloud Storage Configuration (JSONBlob) ---
+// Using a persistent anonymous blob for sync (No tokens required)
+const CLOUD_URL = "https://jsonblob.com/api/jsonBlob/1341071981180428288";
 
-// --- Cloud Storage Configuration (Pantry) ---
-// Using a fresh GUID for zero-config sync (No tokens required)
-const pantryConfig = {
-    id: "91a82f7c-503c-4e8c-8f2c-e2f4f1d4f4e1", // New Fresh GUID
-    basket: "supermegati_db"
-};
-
-const CLOUD_URL = `https://getpantry.cloud/apiv1/pantry/${pantryConfig.id}/basket/${pantryConfig.basket}`;
-
-// --- Data Storage Helpers (Pantry Cloud) ---
+// --- Data Storage Helpers (Cloud) ---
 async function fetchDB() {
     ErrorLogger.info("Sincronizando com a Nuvem...");
     try {
-        const response = await fetch(CLOUD_URL, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (response.status === 404) {
-            ErrorLogger.warn("Banco não encontrado. Inicializando...");
-            return null;
-        }
+        const response = await fetch(CLOUD_URL);
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`CLOUD_API_ERROR: ${response.status} ${errorText}`);
+            ErrorLogger.warn("Dados não encontrados na Nuvem, limpando...");
+            return null;
         }
 
         return await response.json();
     } catch (error) {
         ErrorLogger.error("Erro ao ler banco na Nuvem", error);
         throw error;
+    }
+}
+
+async function saveDB(newData) {
+    try {
+        const response = await fetch(CLOUD_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newData)
+        });
+
+        if (response.ok) {
+            ErrorLogger.success("Sincronizado na Nuvem");
+            return true;
+        } else {
+            ErrorLogger.error(`Erro ao salvar na Nuvem: ${response.status}`);
+            return false;
+        }
+    } catch (error) {
+        ErrorLogger.error("Erro de conexão com a Nuvem", error);
+        return false;
     }
 }
 
@@ -188,20 +194,21 @@ async function loadData(silent = false) {
                 renderDashboard();
             }
         } else {
-            // If data is null or empty, it might be first run
             throw new Error("EMPTY_DATA");
         }
     } catch (error) {
         updateStatus('error');
 
-        // Seed initial users if none exist in store and it's the first failed load
-        if (store.users.length === 0) {
-            store.users = [
-                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin', full_name: 'Ransay (Gestor)' },
-                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user', full_name: 'Usuário' },
-                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user', full_name: 'Usuário Padrão' }
-            ];
-            // Try to initialize the cloud storage with these seeds
+        // Always ensure the admin user exists locally
+        if (store.users.findIndex(u => u.email === 'ransay@supermegavendas.com') === -1) {
+            store.users.push({
+                id: 'u_ransay',
+                email: 'ransay@supermegavendas.com',
+                password: 'admin', // Simplificando a senha para evitar erros
+                username: 'Ransay (Gestor)',
+                role: 'admin',
+                full_name: 'Ransay (Gestor)'
+            });
             persistStore();
         }
     }
@@ -345,16 +352,17 @@ function checkAuthSession() {
     updateNav();
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
+    const email = e.target.email.value.toLowerCase().trim();
     const password = e.target.password.value;
 
-    const user = store.users.find(u => u.email === email && u.password === password);
+    const user = store.users.find(u => u.email.toLowerCase() === email && u.password === password);
+
     if (user) {
         loginSuccess(user);
     } else {
-        showToast('E-mail ou senha incorretos', 'error');
+        showToast('Credenciais inválidas. Verifique seu e-mail e senha.', 'error');
     }
 }
 
