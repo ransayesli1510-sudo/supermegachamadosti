@@ -137,10 +137,13 @@ async function saveDB(newData) {
         if (response.ok) {
             ErrorLogger.success("Dados salvos na Nuvem");
             return true;
+        } else {
+            const errorText = await response.text();
+            ErrorLogger.error(`Erro ao salvar na Nuvem: ${response.status} ${errorText}`);
+            return false;
         }
-        return false;
     } catch (error) {
-        ErrorLogger.error("Erro ao salvar na Nuvem", error);
+        ErrorLogger.error("Erro de conexão ao salvar na Nuvem", error);
         return false;
     }
 }
@@ -474,7 +477,7 @@ async function handleSubmitTicket(e) {
             showHome();
         }
     } else {
-        showToast('Erro ao sincronizar com GitHub.', 'error');
+        showToast('Erro ao sincronizar com a Nuvem.', 'error');
     }
 }
 
