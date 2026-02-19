@@ -92,37 +92,34 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- Cloud Storage Configuration (GitHub) ---
-const githubConfig = {
-    username: "ransayesli1510-sudo",
-    repo: "supermegachamadosti",
-    path: "db.json"
+// --- Cloud Storage Configuration (Pantry) ---
+// Using the verified Pantry ID found in your environment
+const pantryConfig = {
+    id: "0b14c330-8041-4c6e-826c-d227db0290ca",
+    basket: "supermegati_db"
 };
 
-// Security: Advanced obfuscation to prevent automatic token revocation by GitHub scanners
-const _c = [103, 105, 116, 104, 117, 98, 95, 112, 97, 116, 95, 49, 49, 66, 53, 76, 86, 76, 83, 81, 48, 66, 54, 67, 113, 116, 48, 101, 90, 83, 50, 116, 98, 95, 104, 99, 101, 54, 56, 49, 115, 89, 105, 74, 65, 116, 48, 71, 66, 79, 117, 85, 86, 100, 65, 82, 98, 74, 102, 108, 90, 68, 82, 120, 113, 49, 108, 75, 113, 86, 89, 65, 70, 102, 89, 55, 89, 65, 75, 50, 84, 87, 76, 67, 50, 53, 119, 99, 120, 109, 107, 97, 120];
-const _ak = _c.map(x => String.fromCharCode(x)).join('');
-let dbFileSha = null;
+const CLOUD_URL = `https://getpantry.cloud/apiv1/pantry/${pantryConfig.id}/basket/${pantryConfig.basket}`;
 
-// --- Data Storage Helpers (GitHub Cloud) ---
+// --- Data Storage Helpers (Pantry Cloud) ---
 async function fetchDB() {
-    ErrorLogger.info("Sincronizando com GitHub Cloud...");
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
+    ErrorLogger.info("Sincronizando com a Nuvem...");
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `token ${_ak}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+        const response = await fetch(CLOUD_URL, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("API_ERROR");
+        if (response.status === 404 || response.status === 400) {
+            ErrorLogger.warn("Banco ainda não existe na Nuvem. Inicializando...");
+            return null;
+        }
 
-        const data = await response.json();
-        dbFileSha = data.sha;
-        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
-        return JSON.parse(decodedContent);
+        if (!response.ok) {
+            throw new Error(`API_ERROR: ${response.status}`);
+        }
+
+        return await response.json();
     } catch (error) {
         ErrorLogger.error("Erro ao ler banco na Nuvem", error);
         throw error;
@@ -131,29 +128,14 @@ async function fetchDB() {
 
 async function saveDB(newData) {
     try {
-        // Fetch latest SHA to avoid conflict errors
-        const latest = await fetchDB().catch(() => null);
-
-        const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
-        const content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
-
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${_ak}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: "Sync: " + new Date().toISOString(),
-                content: content,
-                sha: dbFileSha
-            })
+        const response = await fetch(CLOUD_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newData)
         });
 
         if (response.ok) {
-            ErrorLogger.success("Sincronizado na Nuvem");
-            const data = await response.json();
-            dbFileSha = data.content.sha;
+            ErrorLogger.success("Dados sincronizados na Nuvem");
             return true;
         } else {
             ErrorLogger.error(`Erro ao salvar na Nuvem: ${response.status}`);
@@ -206,12 +188,13 @@ async function loadData(silent = false) {
     } catch (error) {
         updateStatus('error');
 
-        // Always ensure the admin user exists locally
-        if (store.users.findIndex(u => u.email === 'ransay@supermegavendas.com') === -1) {
+        // Always ensure the admin user exists locally even if cloud fails
+        const adminEmail = 'ransay@supermegavendas.com';
+        if (store.users.findIndex(u => u.email.toLowerCase() === adminEmail) === -1) {
             store.users.push({
                 id: 'u_ransay',
-                email: 'ransay@supermegavendas.com',
-                password: 'admin', // Simplificando a senha para evitar erros
+                email: adminEmail,
+                password: 'admin',
                 username: 'Ransay (Gestor)',
                 role: 'admin',
                 full_name: 'Ransay (Gestor)'
