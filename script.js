@@ -93,8 +93,10 @@ window.addEventListener('offline', () => {
 });
 
 // --- Cloud Storage Configuration (Professional Upgrade: Google Sheets) ---
-// Using Google Apps Script as the backend for 100% stability and CORS compliance.
-let CLOUD_URL = localStorage.getItem('supermegati_cloud_url') || "";
+// Para sincronizar em TODOS os dispositivos, cole o seu link do Google abaixo entre as aspas:
+const HARDCODED_CLOUD_URL = "https://script.google.com/a/macros/supermegavendas.com/s/AKfycbyQU8ZPwjfNZ1ZXxWA8a5Yoru-w3YcDSa_YfAxu7Brp9U1GjZM-c3I77h9cDSFzxqg/exec";
+
+let CLOUD_URL = HARDCODED_CLOUD_URL || localStorage.getItem('supermegati_cloud_url') || "";
 
 // Fallback to previous services if URL is not set (for initial setup)
 const FALLBACK_PANTRY_ID = "0b14c330-8041-4c6e-826c-d227db0290ca";
@@ -110,10 +112,22 @@ async function fetchDB() {
     ErrorLogger.info("Sincronizando com a Nuvem...");
     try {
         const response = await fetch(CLOUD_URL);
-        if (!response.ok) throw new Error(`API_ERROR: ${response.status}`);
-        return await response.json();
+
+        if (!response.ok) {
+            throw new Error(`Servidor retornou erro ${response.status}`);
+        }
+
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            if (text.includes("<html") || text.includes("<body")) {
+                throw new Error("A URL da nuvem retornou uma página HTML em vez de dados. Verifique se você copiou o link de 'Execução' e não o do Editor.");
+            }
+            throw new Error("Resposta da nuvem inválida.");
+        }
     } catch (error) {
-        ErrorLogger.error("Erro ao ler banco na Nuvem", error);
+        ErrorLogger.error("Erro na Sincronização", error);
         throw error;
     }
 }
@@ -125,18 +139,16 @@ async function saveDB(newData) {
     }
 
     try {
+        // We use text/plain to avoid CORS preflight, Apps Script will still get the data in e.postData.contents
         const response = await fetch(CLOUD_URL, {
             method: 'POST',
-            mode: 'no-cors', // Apps Script requires no-cors for simple POSTs or proper CORS for preflighted
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newData)
         });
 
-        // With no-cors, we can't see the response body, but Apps Script always succeeds if it doesn't throw
-        ErrorLogger.success("Dados enviados para a Nuvem");
+        ErrorLogger.success("Dados salvos na Nuvem");
         return true;
     } catch (error) {
-        ErrorLogger.error("Erro de conexão na Nuvem", error);
+        ErrorLogger.error("Falha ao salvar na Nuvem", error);
         return false;
     }
 }
@@ -592,9 +604,13 @@ function getAdminActions(ticketId) {
 
 // Global setup for Cloud
 window.setupCloud = function () {
-    const url = prompt("Cole aqui a URL do seu Google Apps Script:", CLOUD_URL);
+    let url = prompt("Cole aqui a URL do seu Google Apps Script (deve terminar em /exec):", CLOUD_URL);
     if (url !== null) {
-        CLOUD_URL = url.trim();
+        url = url.trim();
+        if (url && !url.includes("/exec")) {
+            showToast("Atenção: A URL deve terminar em /exec. Verifique se você não copiou a URL do editor.", "error");
+        }
+        CLOUD_URL = url;
         localStorage.setItem('supermegati_cloud_url', CLOUD_URL);
         showToast("Nuvem configurada! Sincronizando...", "success");
         loadData();
