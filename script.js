@@ -110,11 +110,14 @@ async function fetchDB() {
         });
 
         if (response.status === 404) {
-            // Basket doesn't exist yet, return null to trigger fallbacks
+            ErrorLogger.warn("Banco não encontrado. Inicializando...");
             return null;
         }
 
-        if (!response.ok) throw new Error("CLOUD_API_ERROR");
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`CLOUD_API_ERROR: ${response.status} ${errorText}`);
+        }
 
         return await response.json();
     } catch (error) {
@@ -404,13 +407,16 @@ function handleLogout() {
 }
 
 function updateNav() {
+    const navDashboard = document.getElementById('nav-dashboard-btn');
     if (store.user) {
         dom.navLogin.classList.add('hidden');
         dom.navLogout.classList.remove('hidden');
+        if (navDashboard) navDashboard.classList.remove('hidden');
         dom.navTicket.onclick = () => showSection('ticket-form');
     } else {
         dom.navLogin.classList.remove('hidden');
         dom.navLogout.classList.add('hidden');
+        if (navDashboard) navDashboard.classList.add('hidden');
         dom.navTicket.onclick = () => showSection('ticket-form');
     }
 }
@@ -474,14 +480,15 @@ async function handleSubmitTicket(e) {
 
 // --- Dashboard Logic ---
 function renderDashboard() {
-    // Determine title
-    if (store.user) {
-        dom.dashboardTitle.textContent = store.user.role === 'admin'
-            ? 'Painel Administrativo'
-            : 'Meus Chamados';
-    } else {
-        dom.dashboardTitle.textContent = 'Chamados Públicos';
+    if (!store.user) {
+        showSection('login');
+        return;
     }
+
+    // Determine title
+    dom.dashboardTitle.textContent = store.user.role === 'admin'
+        ? 'Painel Administrativo'
+        : 'Meus Chamados';
 
     // Clear current
     dom.ticketsTableBody.innerHTML = '';
@@ -489,12 +496,8 @@ function renderDashboard() {
 
     // Filter tickets based on role
     let displayTickets = store.tickets;
-    if (store.user && store.user.role !== 'admin') {
+    if (store.user.role !== 'admin') {
         displayTickets = store.tickets.filter(t => t.created_by === store.user.id);
-    } else if (!store.user) {
-        // Guests see all tickets, but maybe we should only show their own if we track by email?
-        // User requested "visualizar em qualquer navegador", so showing all is better for now.
-        displayTickets = store.tickets;
     }
 
     // Render Stats for Admin
