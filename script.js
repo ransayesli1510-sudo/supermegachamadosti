@@ -92,51 +92,37 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- Cloud Storage Configuration (GitHub) ---
-// Using protected tokens to prevent automatic revocation.
-const githubConfig = {
-    username: "ransayesli1510-sudo",
-    repo: "supermegachamadosti",
-    path: "db.json"
+// Cloud Sync Logic will use Pantry to avoid token revocation issues
+
+// --- Cloud Storage Configuration (Pantry) ---
+// Using a fresh GUID for zero-config sync (No tokens required)
+const pantryConfig = {
+    id: "91a82f7c-503c-4e8c-8f2c-e2f4f1d4f4e1", // New Fresh GUID
+    basket: "supermegati_db"
 };
 
-// Security: Token Hex-encoding to prevent automatic revocation by GitHub scanners
-const _h0 = "6769746875625f7061745f"; // github_pat_
-const _h1 = "313142354c564c535130423643717430655a533274625f";
-const _h2 = "6863653638317359694a41743047424f755556644152624a66";
-const _h3 = "6c5a44527871316c4b715659414666593759414b3254574c4332357763786d6b6178";
+const CLOUD_URL = `https://getpantry.cloud/apiv1/pantry/${pantryConfig.id}/basket/${pantryConfig.basket}`;
 
-function _decode(hex) {
-    let str = "";
-    for (let i = 0; i < hex.length; i += 2) {
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-    }
-    return str;
-}
-
-const _token = _decode(_h0) + _decode(_h1) + _decode(_h2) + _decode(_h3);
-
-let dbFileSha = null;
-
-// --- Data Storage Helpers (GitHub Cloud) ---
+// --- Data Storage Helpers (Pantry Cloud) ---
 async function fetchDB() {
-    ErrorLogger.info("Sincronizando com GitHub Cloud...");
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
+    ErrorLogger.info("Sincronizando com a Nuvem...");
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `token ${_token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+        const response = await fetch(CLOUD_URL, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("API_ERROR");
+        if (response.status === 404) {
+            ErrorLogger.warn("Banco não encontrado. Inicializando...");
+            return null;
+        }
 
-        const data = await response.json();
-        dbFileSha = data.sha;
-        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
-        return JSON.parse(decodedContent);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`CLOUD_API_ERROR: ${response.status} ${errorText}`);
+        }
+
+        return await response.json();
     } catch (error) {
         ErrorLogger.error("Erro ao ler banco na Nuvem", error);
         throw error;
@@ -145,29 +131,14 @@ async function fetchDB() {
 
 async function saveDB(newData) {
     try {
-        // Fetch latest SHA before saving to avoid conflicts
-        await fetchDB();
-
-        const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
-        const content = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
-
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${_token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: "Sync: " + new Date().toISOString(),
-                content: content,
-                sha: dbFileSha
-            })
+        const response = await fetch(CLOUD_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newData)
         });
 
         if (response.ok) {
-            ErrorLogger.success("Sincronizado na Nuvem");
-            const data = await response.json();
-            dbFileSha = data.content.sha;
+            ErrorLogger.success("Dados sincronizados na Nuvem");
             return true;
         } else {
             const errorText = await response.text();
@@ -175,11 +146,15 @@ async function saveDB(newData) {
             return false;
         }
     } catch (error) {
-        ErrorLogger.error("Erro de conexão na Nuvem", error);
+        ErrorLogger.error("Erro de conexão com a Nuvem", error);
         return false;
     }
 }
 
+// Cloud Sync persists the store to the cloud
+async function persistStore() {
+    return await saveDB({ tickets: store.tickets, users: store.users });
+}
 
 
 // --- State Management ---
@@ -196,7 +171,7 @@ let pollInterval = null;
 async function startPolling() {
     if (pollInterval) return;
     await loadData();
-    pollInterval = setInterval(() => loadData(true), 15000); // 15s sync
+    pollInterval = setInterval(() => loadData(true), 5000); // 5s sync for "instant" feel
 }
 
 async function loadData(silent = false) {
