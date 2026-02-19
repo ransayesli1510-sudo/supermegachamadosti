@@ -121,10 +121,10 @@ async function fetchDB() {
         try {
             return JSON.parse(text);
         } catch (e) {
-            if (text.includes("<html") || text.includes("<body")) {
-                throw new Error("A URL da nuvem retornou uma página HTML em vez de dados. Verifique se você copiou o link de 'Execução' e não o do Editor.");
+            if (text.includes("<html") || text.includes("<body") || text.includes("google-login")) {
+                throw new Error("A nuvem está pedindo login do Google. Isso acontece quando 'Quem tem acesso' não está marcado como 'Qualquer pessoa'. Se você usa e-mail de empresa, o Google pode estar bloqueando o acesso externo.");
             }
-            throw new Error("Resposta da nuvem inválida.");
+            throw new Error("Resposta da nuvem inválida ou vazia.");
         }
     } catch (error) {
         ErrorLogger.error("Erro na Sincronização", error);
