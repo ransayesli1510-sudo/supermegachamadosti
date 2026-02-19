@@ -92,59 +92,53 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- Cloud Storage Configuration (KVDB.io) ---
-// Using a unique bucket for Super Mega Ti that doesn't require tokens.
-const cloudConfig = {
-    bucketId: "smvtih_2026_x9k2p",
-    dbKey: "main_data"
-};
+// --- Cloud Storage Configuration (Resilient Sync) ---
+// Using jsonbase as a sync layer. localStorage is the primary DB.
+const CLOUD_URL = "https://jsonbase.com/supermegati_2026_resilient/main";
 
-const CLOUD_URL = `https://kvdb.io/${cloudConfig.bucketId}/${cloudConfig.dbKey}`;
-
-// --- Data Storage Helpers (Cloud) ---
+// --- Data Storage Helpers ---
 async function fetchDB() {
-    ErrorLogger.info("Sincronizando com a Nuvem (KV)...");
+    // 1. Always try Cloud first to get latest updates
     try {
-        const response = await fetch(CLOUD_URL, {
-            method: 'GET'
-        });
-
-        if (response.status === 404) {
-            ErrorLogger.warn("Banco não encontrado. Inicializando...");
-            return null;
+        const response = await fetch(CLOUD_URL);
+        if (response.ok) {
+            const data = await response.json();
+            if (data) {
+                // Update local cache
+                localStorage.setItem('helpdesk_db', JSON.stringify(data));
+                return data;
+            }
         }
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`CLOUD_API_ERROR: ${response.status} ${errorText}`);
-        }
-
-        return await response.json();
     } catch (error) {
-        ErrorLogger.error("Erro ao ler banco na Nuvem", error);
-        throw error;
+        ErrorLogger.warn("Nuvem indisponível, usando dados locais.");
     }
+
+    // 2. Fallback to local
+    const local = localStorage.getItem('helpdesk_db');
+    return local ? JSON.parse(local) : null;
 }
 
 async function saveDB(newData) {
+    // 1. Save locally first (Instant)
+    localStorage.setItem('helpdesk_db', JSON.stringify(newData));
+
+    // 2. Sync to Cloud in background
     try {
         const response = await fetch(CLOUD_URL, {
-            method: 'POST',
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newData)
         });
 
         if (response.ok) {
-            ErrorLogger.success("Dados salvos na Nuvem");
+            ErrorLogger.success("Sincronizado com a Nuvem");
             return true;
-        } else {
-            const errorText = await response.text();
-            ErrorLogger.error(`Erro ao salvar na Nuvem: ${response.status} ${errorText}`);
-            return false;
         }
     } catch (error) {
-        ErrorLogger.error("Erro de conexão ao salvar na Nuvem", error);
-        return false;
+        // Silent fail for cloud, we have local copy
+        ErrorLogger.warn("Erro de sincronização em segundo plano");
     }
+    return true; // Return true because local save succeeded
 }
 
 
