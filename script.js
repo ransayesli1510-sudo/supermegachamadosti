@@ -94,7 +94,7 @@ window.addEventListener('offline', () => {
 
 // --- Cloud Storage Configuration (Professional Upgrade: Google Sheets) ---
 // Para sincronizar em TODOS os dispositivos, cole o seu link do Google abaixo entre as aspas:
-const HARDCODED_CLOUD_URL = "https://script.google.com/a/macros/supermegavendas.com/s/AKfycbyQU8ZPwjfNZ1ZXxWA8a5Yoru-w3YcDSa_YfAxu7Brp9U1GjZM-c3I77h9cDSFzxqg/exec";
+const HARDCODED_CLOUD_URL = "https://script.google.com/macros/s/AKfycbw7KmtAswwTHg5dUwQ5Ra-rIUvZSSlv6RER4SNSVJf9cMKxo5URFoAmFsDHEfII93KL/exec";
 
 let CLOUD_URL = HARDCODED_CLOUD_URL || localStorage.getItem('supermegati_cloud_url') || "";
 
