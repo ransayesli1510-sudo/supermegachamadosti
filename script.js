@@ -92,94 +92,52 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- GitHub as Database Configuration ---
-const githubConfig = {
-    username: "ransayesli1510-sudo",
-    repo: "supermegachamadosti",
-    token: "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",
-    branch: "main",
-    path: "db.json"
+// --- Pantry Cloud Configuration ---
+const pantryConfig = {
+    pantryId: "0b14c330-8041-4c6e-826c-d227db0290ca", // Dedicated ID for Super Mega Ti
+    basketName: "helpdesk_db"
 };
 
-// --- GitHub API Helpers ---
-let dbFileSha = null;
+const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${pantryConfig.pantryId}/basket/${pantryConfig.basketName}`;
 
+// --- Data Storage Helpers (Pantry Cloud) ---
 async function fetchDB() {
-    ErrorLogger.info("Sincronizando com GitHub...");
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}?t=${Date.now()}`;
+    ErrorLogger.info("Sincronizando com a Nuvem...");
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `token ${githubConfig.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+        const response = await fetch(PANTRY_URL, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        if (response.status === 401 || response.status === 403) {
-            throw new Error("AUTH_ERROR");
+        if (response.status === 404) {
+            // Basket doesn't exist yet, return null to trigger fallbacks
+            return null;
         }
 
-        if (!response.ok) throw new Error("API_ERROR");
+        if (!response.ok) throw new Error("CLOUD_API_ERROR");
 
-        const data = await response.json();
-        dbFileSha = data.sha;
-        const decodedContent = new TextDecoder().decode(Uint8Array.from(atob(data.content), c => c.charCodeAt(0)));
-        return JSON.parse(decodedContent);
+        return await response.json();
     } catch (error) {
-        if (error.message === "AUTH_ERROR") throw error;
-        ErrorLogger.error("Erro ao ler banco do GitHub", error);
+        ErrorLogger.error("Erro ao ler banco na Nuvem", error);
         throw error;
     }
 }
 
 async function saveDB(newData) {
-    const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.path}`;
-
-    // Get latest SHA
     try {
-        const check = await fetch(url + `?t=${Date.now()}`, {
-            headers: { 'Authorization': `token ${githubConfig.token}` }
+        const response = await fetch(PANTRY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newData)
         });
-        if (check.ok) {
-            const checkData = await check.json();
-            dbFileSha = checkData.sha;
-        } else if (check.status === 401 || check.status === 403) {
-            throw new Error("AUTH_ERROR");
-        }
-    } catch (e) {
-        if (e.message === "AUTH_ERROR") return false; // Early exit on auth fail
-    }
-
-    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(newData, null, 2))));
-    const body = {
-        message: "Update DB via App",
-        content: contentEncoded,
-        sha: dbFileSha,
-        branch: githubConfig.branch
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${githubConfig.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-
-        if (response.status === 401 || response.status === 403) {
-            throw new Error("AUTH_ERROR");
-        }
 
         if (response.ok) {
-            const data = await response.json();
-            dbFileSha = data.content.sha;
+            ErrorLogger.success("Dados salvos na Nuvem");
             return true;
         }
         return false;
     } catch (error) {
-        ErrorLogger.error("Erro ao salvar no GitHub", error);
+        ErrorLogger.error("Erro ao salvar na Nuvem", error);
         return false;
     }
 }
@@ -208,29 +166,30 @@ async function loadData(silent = false) {
 
     try {
         const data = await fetchDB();
-        if (data) {
+        if (data && (data.tickets || data.users)) {
             updateStatus('connected');
             store.tickets = data.tickets || [];
             store.users = data.users || [];
 
-            if (store.view === 'dashboard' && store.user) {
+            if (store.view === 'dashboard') {
                 renderDashboard();
             }
+        } else {
+            // If data is null or empty, it might be first run
+            throw new Error("EMPTY_DATA");
         }
     } catch (error) {
-        if (error.message === "AUTH_ERROR") {
-            updateStatus('auth_error');
-        } else {
-            updateStatus('error');
-        }
+        updateStatus('error');
 
-        // Initial fallbacks if empty (only on first load fail)
+        // Seed initial users if none exist in store and it's the first failed load
         if (store.users.length === 0) {
             store.users = [
-                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin' },
-                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user' },
-                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user' }
+                { id: 'u1', email: 'ransay@supermegavendas.com', password: 'admin123', username: 'Ransay (Gestor)', role: 'admin', full_name: 'Ransay (Gestor)' },
+                { id: 'u2', email: 'user', password: 'user123', username: 'Usuário', role: 'user', full_name: 'Usuário' },
+                { id: 'u3', email: 'user@email.com', password: 'user123', username: 'Usuário Padrão', role: 'user', full_name: 'Usuário Padrão' }
             ];
+            // Try to initialize the cloud storage with these seeds
+            persistStore();
         }
     }
 }
@@ -242,13 +201,13 @@ function updateStatus(state) {
 
     if (state === 'connected') {
         dot.className = 'status-dot status-connected';
-        text.textContent = 'Conectado (GitHub)';
+        text.textContent = 'Nuvem Conectada';
     } else if (state === 'error') {
         dot.className = 'status-dot status-error';
-        text.textContent = 'Erro Conexão';
+        text.textContent = 'Erro na Nuvem';
     } else if (state === 'auth_error') {
         dot.className = 'status-dot status-auth-error';
-        text.textContent = 'Erro Autenticação (Token)';
+        text.textContent = 'Erro de Acesso';
     } else if (state === 'syncing') {
         dot.className = 'status-dot status-syncing';
         text.textContent = 'Sincronizando...';
@@ -448,11 +407,11 @@ function updateNav() {
     if (store.user) {
         dom.navLogin.classList.add('hidden');
         dom.navLogout.classList.remove('hidden');
-        dom.navTicket.onclick = () => showSection('ticket-form'); // Authenticated can goes straight to form
+        dom.navTicket.onclick = () => showSection('ticket-form');
     } else {
         dom.navLogin.classList.remove('hidden');
         dom.navLogout.classList.add('hidden');
-        dom.navTicket.onclick = () => showSection('ticket-form'); // Guest can also open ticket
+        dom.navTicket.onclick = () => showSection('ticket-form');
     }
 }
 
@@ -515,11 +474,14 @@ async function handleSubmitTicket(e) {
 
 // --- Dashboard Logic ---
 function renderDashboard() {
-    if (!store.user) return;
-
-    dom.dashboardTitle.textContent = store.user.role === 'admin'
-        ? 'Painel Administrativo'
-        : 'Meus Chamados';
+    // Determine title
+    if (store.user) {
+        dom.dashboardTitle.textContent = store.user.role === 'admin'
+            ? 'Painel Administrativo'
+            : 'Meus Chamados';
+    } else {
+        dom.dashboardTitle.textContent = 'Chamados Públicos';
+    }
 
     // Clear current
     dom.ticketsTableBody.innerHTML = '';
@@ -527,8 +489,12 @@ function renderDashboard() {
 
     // Filter tickets based on role
     let displayTickets = store.tickets;
-    if (store.user.role !== 'admin') {
+    if (store.user && store.user.role !== 'admin') {
         displayTickets = store.tickets.filter(t => t.created_by === store.user.id);
+    } else if (!store.user) {
+        // Guests see all tickets, but maybe we should only show their own if we track by email?
+        // User requested "visualizar em qualquer navegador", so showing all is better for now.
+        displayTickets = store.tickets;
     }
 
     // Render Stats for Admin
@@ -585,7 +551,7 @@ function renderDashboard() {
                 <td>${dateStr}</td>
                 <td><span class="status-badge ${ticket.status.toLowerCase().replace(' ', '-')}">${ticket.status}</span></td>
                 <td class="actions-col">
-                    ${store.user.role === 'admin' ? getAdminActions(ticket.id) : '<button class="btn-outline btn-sm" disabled>Ver</button>'}
+                    ${store.user && store.user.role === 'admin' ? getAdminActions(ticket.id) : '<button class="btn-outline btn-sm" disabled>Ver</button>'}
                 </td>
             `;
             dom.ticketsTableBody.appendChild(tr);
