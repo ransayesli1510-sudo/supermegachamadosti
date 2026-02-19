@@ -92,21 +92,21 @@ window.addEventListener('offline', () => {
     if (typeof updateStatus === 'function') updateStatus('error');
 });
 
-// --- Pantry Cloud Configuration ---
-const pantryConfig = {
-    pantryId: "0b14c330-8041-4c6e-826c-d227db0290ca", // Dedicated ID for Super Mega Ti
-    basketName: "helpdesk_db"
+// --- Cloud Storage Configuration (KVDB.io) ---
+// Using a unique bucket for Super Mega Ti that doesn't require tokens.
+const cloudConfig = {
+    bucketId: "smvtih_2026_x9k2p",
+    dbKey: "main_data"
 };
 
-const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${pantryConfig.pantryId}/basket/${pantryConfig.basketName}`;
+const CLOUD_URL = `https://kvdb.io/${cloudConfig.bucketId}/${cloudConfig.dbKey}`;
 
-// --- Data Storage Helpers (Pantry Cloud) ---
+// --- Data Storage Helpers (Cloud) ---
 async function fetchDB() {
-    ErrorLogger.info("Sincronizando com a Nuvem...");
+    ErrorLogger.info("Sincronizando com a Nuvem (KV)...");
     try {
-        const response = await fetch(PANTRY_URL, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+        const response = await fetch(CLOUD_URL, {
+            method: 'GET'
         });
 
         if (response.status === 404) {
@@ -128,9 +128,8 @@ async function fetchDB() {
 
 async function saveDB(newData) {
     try {
-        const response = await fetch(PANTRY_URL, {
+        const response = await fetch(CLOUD_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newData)
         });
 
