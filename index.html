@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RocketFlow | Portal Intersetorial de Chamados e BI</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- FontAwesome & Lucide Icons via CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js for BI & Dashboards -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- ================= AUTH WRAPPER (LOGIN & CADASTRO) ================= -->
+  <div id="auth-screen" class="auth-wrapper">
+    <div class="auth-container glass">
+      <div class="auth-logo-section">
+        <div class="rocket-logo">
+          <!-- Animated Rocket SVG -->
+          <svg class="rocket-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.5 16.5C3.5 18 3 21 3 21C3 21 6 20.5 7.5 19.5" stroke="#FFD200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15L9 18L3 21L6 15L9 12L12 15Z" stroke="#FFD200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15L15 12M15 12C17.5 9.5 21 3 21 3C21 3 14.5 6.5 12 9M15 12L9 12M12 9V15" stroke="#FFD200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="rocket-flame" d="M9 18C7.5 18.5 6 21 6 21C6 21 8.5 19.5 9 18Z" fill="#FFD200"/>
+          </svg>
+        </div>
+        <h1 class="auth-title">Rocket<span>Flow</span></h1>
+        <p class="auth-subtitle">Comunicação e Chamados Intersetoriais</p>
+      </div>
+
+      <div class="auth-tabs">
+        <div id="tab-login-toggle" class="auth-tab active" onclick="switchAuthTab('login')">Entrar</div>
+        <div id="tab-register-toggle" class="auth-tab" onclick="switchAuthTab('register')">Cadastrar</div>
+      </div>
+
+      <div id="auth-alert" class="auth-alert"></div>
+
+      <!-- Login Form -->
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="login-matricula">Matrícula</label>
+          <input type="text" id="login-matricula" class="form-input" placeholder="Ex: 2026859" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-senha">Senha</label>
+          <input type="password" id="login-senha" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="form-submit-btn glow-btn">Decolar para o Painel</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" style="display: none;" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label class="form-label" for="reg-matricula">Matrícula</label>
+          <input type="text" id="reg-matricula" class="form-input" placeholder="Ex: 2026859" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg-name">Nome Completo</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="Ex: Michael Souza" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg-sector">Setor de Atuação</label>
+          <select id="reg-sector" class="form-select" required>
+            <option value="" disabled selected>Selecione seu setor...</option>
+            <option value="Vendas">Vendas</option>
+            <option value="Admin/Financeiro">Administrativo & Financeiro</option>
+            <option value="TI">Tecnologia da Informação (TI)</option>
+            <option value="Marketing">Marketing</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg-senha">Senha</label>
+          <input type="password" id="reg-senha" class="form-input" placeholder="Crie uma senha segura" required>
+        </div>
+        <button type="submit" class="form-submit-btn glow-btn">Confirmar Cadastro</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MAIN PLATFORM LAYOUT ================= -->
+  <div id="main-platform" class="app-wrapper" style="display: none;">
+    
+    <!-- Sidebar -->
+    <aside class="app-sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon-container">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD200" stroke-width="2">
+            <path d="M4.5 16.5C3.5 18 3 21 3 21C3 21 6 20.5 7.5 19.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15L9 18L3 21L6 15L9 12L12 15Z" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15L15 12M15 12C17.5 9.5 21 3 21 3C21 3 14.5 6.5 12 9M15 12L9 12M12 9V15" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">Rocket<span>Flow</span></span>
+      </div>
+
+      <!-- User Context -->
+      <div class="user-card">
+        <div class="user-header-info">
+          <div id="user-avatar-lbl" class="user-avatar">?</div>
+          <div class="user-details">
+            <div id="user-name-lbl" class="user-name">Carregando...</div>
+            <div class="user-meta">
+              <span id="user-matricula-lbl">Matrícula: -</span>
+              <span id="user-sector-badge" class="user-badge">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menu Items -->
+      <ul class="sidebar-menu">
+        <li class="menu-item active" onclick="switchTab('dashboard')" id="menu-dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard Geral</span>
+        </li>
+        <li class="menu-item" onclick="switchTab('novo-chamado')" id="menu-novo-chamado">
+          <i data-lucide="plus-circle"></i>
+          <span>Novo Chamado</span>
+        </li>
+        <li class="menu-item" onclick="switchTab('analytics')" id="menu-analytics">
+          <i data-lucide="pie-chart"></i>
+          <span>BI & Analytics</span>
+        </li>
+        <li class="menu-item logout-btn" onclick="handleLogout()">
+          <i data-lucide="log-out"></i>
+          <span>Sair</span>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="app-content">
+      
+      <!-- Content Header -->
+      <header class="content-header">
+        <div class="header-title">
+          <h2 id="page-title">Dashboard Geral</h2>
+          <p id="page-subtitle">Acompanhe chamados ativos, fluxo de processos e pipelines de vendas.</p>
+        </div>
+        <div class="header-actions">
+          <button class="quick-action-btn glow-btn" onclick="switchTab('novo-chamado')">
+            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+            Novo Chamado
+          </button>
+        </div>
+      </header>
+
+      <!-- ================= TAB: DASHBOARD GERAL ================= -->
+      <div id="tab-dashboard" class="tab-pane active">
+        <!-- KPIs Row -->
+        <div class="kpis-grid">
+          <div class="kpi-card glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Chamados Abertos</span>
+              <div class="kpi-icon"><i data-lucide="activity"></i></div>
+            </div>
+            <div id="kpi-tickets-open" class="kpi-value">0</div>
+            <div class="kpi-trend neutral"><span>Aguardando tratativa</span></div>
+          </div>
+
+          <div class="kpi-card glass" style="--card-accent: var(--status-concluido)">
+            <div class="kpi-header">
+              <span class="kpi-title">Chamados Concluídos</span>
+              <div class="kpi-icon"><i data-lucide="check-circle-2"></i></div>
+            </div>
+            <div id="kpi-tickets-closed" class="kpi-value">0</div>
+            <div class="kpi-trend positive"><i data-lucide="trending-up"></i> <span id="kpi-tickets-completion-rate">0% resolução</span></div>
+          </div>
+
+          <div class="kpi-card glass" style="--card-accent: var(--primary)">
+            <div class="kpi-header">
+              <span class="kpi-title">Vendas Convertidas</span>
+              <div class="kpi-icon"><i data-lucide="dollar-sign"></i></div>
+            </div>
+            <div id="kpi-sales-value" class="kpi-value">R$ 0</div>
+            <div class="kpi-trend positive"><i data-lucide="trending-up"></i> <span id="kpi-sales-count">0 negócios</span></div>
+          </div>
+
+          <div class="kpi-card glass" style="--card-accent: var(--status-devolvido)">
+            <div class="kpi-header">
+              <span class="kpi-title">Processos Devolvidos</span>
+              <div class="kpi-icon"><i data-lucide="alert-triangle"></i></div>
+            </div>
+            <div id="kpi-tickets-returned" class="kpi-value">0</div>
+            <div class="kpi-trend negative"><span>Requer atenção imediata</span></div>
+          </div>
+        </div>
+
+        <!-- Section: Kanban Chamados -->
+        <div class="kanban-section-title">
+          <i data-lucide="folder-kanban" style="color: var(--primary)"></i>
+          <span>Fluxo de Chamados Intersetoriais</span>
+        </div>
+
+        <div class="kanban-grid">
+          <!-- Coluna: Processo Aberto -->
+          <div class="kanban-column" style="--column-color: var(--status-aberto)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Processo Aberto</span>
+              <span id="count-aberto" class="kanban-count">0</span>
+            </div>
+            <div id="col-aberto" class="kanban-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Coluna: Processo em Andamento -->
+          <div class="kanban-column" style="--column-color: var(--status-andamento)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Em Andamento</span>
+              <span id="count-andamento" class="kanban-count">0</span>
+            </div>
+            <div id="col-andamento" class="kanban-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Coluna: Processo Concluído -->
+          <div class="kanban-column" style="--column-color: var(--status-concluido)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Concluído</span>
+              <span id="count-concluido" class="kanban-count">0</span>
+            </div>
+            <div id="col-concluido" class="kanban-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Coluna: Processo Devolvido -->
+          <div class="kanban-column" style="--column-color: var(--status-devolvido)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Devolvido</span>
+              <span id="count-devolvido" class="kanban-count">0</span>
+            </div>
+            <div id="col-devolvido" class="kanban-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Kanban Vendas -->
+        <div class="kanban-section-title">
+          <i data-lucide="trending-up" style="color: var(--primary)"></i>
+          <span>Acompanhamento de Vendas (CRM)</span>
+        </div>
+
+        <div class="kanban-grid">
+          <!-- Coluna Vendas: Leads -->
+          <div class="kanban-column" style="--column-color: var(--text-muted)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Novos Leads</span>
+              <span id="vendas-count-lead" class="kanban-count">0</span>
+            </div>
+            <div id="vendas-col-lead" class="kanban-cards">
+              <!-- Sales card template -->
+            </div>
+          </div>
+
+          <!-- Coluna Vendas: Negociação -->
+          <div class="kanban-column" style="--column-color: var(--status-andamento)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Em Negociação</span>
+              <span id="vendas-count-negociacao" class="kanban-count">0</span>
+            </div>
+            <div id="vendas-col-negociacao" class="kanban-cards"></div>
+          </div>
+
+          <!-- Coluna Vendas: Proposta -->
+          <div class="kanban-column" style="--column-color: var(--status-aberto)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Proposta Enviada</span>
+              <span id="vendas-count-proposta" class="kanban-count">0</span>
+            </div>
+            <div id="vendas-col-proposta" class="kanban-cards"></div>
+          </div>
+
+          <!-- Coluna Vendas: Ganho / Devolvido -->
+          <div class="kanban-column" style="--column-color: var(--status-concluido)">
+            <div class="kanban-column-header">
+              <span class="kanban-column-title">Ganho / Retornado</span>
+              <span id="vendas-count-ganho" class="kanban-count">0</span>
+            </div>
+            <div id="vendas-col-ganho" class="kanban-cards"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: NOVO CHAMADO ================= -->
+      <div id="tab-novo-chamado" class="tab-pane">
+        <div class="form-panel glass">
+          <div class="form-panel-header">
+            <h3>Abertura de Chamado Intersetorial</h3>
+            <p>Envie solicitações com anexos para outros setores da empresa de forma integrada.</p>
+          </div>
+
+          <form id="create-ticket-form" onsubmit="handleCreateTicket(event)">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Setor de Origem</label>
+                <input type="text" id="ticket-origin" class="form-input" disabled>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ticket-dest">Setor Destinatário</label>
+                <select id="ticket-dest" class="form-select" required>
+                  <option value="" disabled selected>Selecione o setor...</option>
+                  <option value="Vendas">Vendas</option>
+                  <option value="Admin/Financeiro">Administrativo & Financeiro</option>
+                  <option value="TI">Tecnologia da Informação (TI)</option>
+                  <option value="Marketing">Marketing</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ticket-title">Título do Chamado</label>
+              <input type="text" id="ticket-title" class="form-input" placeholder="Ex: Solicitação de relatório de vendas mensal" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ticket-desc">Descrição Detalhada</label>
+              <textarea id="ticket-desc" class="form-textarea" rows="6" placeholder="Escreva o texto do seu chamado explicando detalhadamente a solicitação..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Anexar Arquivo</label>
+              <!-- Drag and drop zone -->
+              <div id="upload-zone" class="file-upload-zone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" onclick="triggerFileInput()">
+                <i data-lucide="cloud-upload" class="upload-icon"></i>
+                <p class="upload-text"><span>Clique para enviar</span> ou arraste o arquivo até aqui</p>
+                <p class="upload-hint">PDF, Imagens, Documentos, ZIP (Máx. 5MB)</p>
+                <input type="file" id="ticket-file" class="file-input-hidden" onchange="handleFileSelect(event)">
+              </div>
+
+              <!-- Preview container -->
+              <div id="attachment-preview" class="attachment-preview-container">
+                <div class="attachment-info">
+                  <i data-lucide="file-text" class="attachment-file-icon"></i>
+                  <div>
+                    <span id="preview-filename" class="attachment-name">arquivo.pdf</span>
+                    <span id="preview-filesize" class="attachment-size">0 KB</span>
+                  </div>
+                </div>
+                <button type="button" class="remove-attachment-btn" onclick="clearAttachment(event)">
+                  <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="glow-btn form-submit-btn" style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <i data-lucide="send" style="width:18px;height:18px;"></i>
+              Disparar Chamado
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ================= TAB: BI & ANALYTICS ================= -->
+      <div id="tab-analytics" class="tab-pane">
+        <!-- Dashboard Analytics -->
+        <div class="charts-grid">
+          
+          <!-- Chamados por Destino (Pie/Doughnut Chart) -->
+          <div class="chart-card glass">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Volume de Chamados por Setor Destinatário</span>
+              <i data-lucide="pie-chart" style="color: var(--primary)"></i>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-sector-dest"></canvas>
+            </div>
+          </div>
+
+          <!-- KPI stats block in BI -->
+          <div class="summary-stats-box">
+            <div class="stat-item glass">
+              <div class="stat-item-label">Tempo Médio de Resolução</div>
+              <div class="stat-item-value">2.4 horas</div>
+              <div style="font-size:0.75rem; color:var(--status-concluido); margin-top:8px;">-15% que o mês anterior</div>
+            </div>
+            <div class="stat-item glass">
+              <div class="stat-item-label">Taxa de Conversão</div>
+              <div class="stat-item-value" id="bi-conversion-rate">0.0%</div>
+              <div style="font-size:0.75rem; color:var(--primary); margin-top:8px;">Pipeline ativo</div>
+            </div>
+            <div class="stat-item glass">
+              <div class="stat-item-label">Total Resolvidos</div>
+              <div class="stat-item-value" id="bi-resolved-count">0</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">Este mês</div>
+            </div>
+            <div class="stat-item glass">
+              <div class="stat-item-label">Chamados Devolvidos</div>
+              <div class="stat-item-value" id="bi-returned-count">0</div>
+              <div style="font-size:0.75rem; color:var(--status-devolvido); margin-top:8px;">Requerem reavaliação</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-grid" style="grid-template-columns: 1fr 1fr;">
+          <!-- Volume Sent/Received per Sector (Bar Chart) -->
+          <div class="chart-card glass">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Fluxo de Chamados Enviados vs Recebidos</span>
+              <i data-lucide="bar-chart-3" style="color: var(--primary)"></i>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-flow-io"></canvas>
+            </div>
+          </div>
+
+          <!-- Sales Pipeline Values and Targets (Line / Area Chart) -->
+          <div class="chart-card glass">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Desempenho Financeiro de Vendas</span>
+              <i data-lucide="trending-up" style="color: var(--primary)"></i>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-sales-trend"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ================= TICKET DETAILS MODAL ================= -->
+  <div id="ticket-modal" class="modal-overlay" onclick="closeTicketModal(event)">
+    <div class="modal-container glass" onclick="event.stopPropagation()">
+      <button class="modal-close-btn" onclick="closeTicketModal(event)">
+        <i data-lucide="x"></i>
+      </button>
+      
+      <div class="modal-header">
+        <div class="modal-tag-row">
+          <span id="modal-ticket-id" class="card-id">CH-000</span>
+          <span id="modal-status" class="modal-status-badge">Processo Aberto</span>
+        </div>
+        <h3 id="modal-title" class="modal-title">Título do Chamado</h3>
+      </div>
+
+      <div class="modal-meta-grid">
+        <div>
+          <span class="meta-item-label">Origem</span>
+          <div id="modal-origin" class="meta-item-value">Vendas</div>
+        </div>
+        <div>
+          <span class="meta-item-label">Destinatário</span>
+          <div id="modal-destination" class="meta-item-value">TI</div>
+        </div>
+        <div>
+          <span class="meta-item-label">Criado por</span>
+          <div id="modal-creator" class="meta-item-value">Nome Colaborador</div>
+        </div>
+        <div>
+          <span class="meta-item-label">Data de Abertura</span>
+          <div id="modal-date" class="meta-item-value">22/06/2026 às 10:00</div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <h4>Descrição do Processo</h4>
+        <p id="modal-desc" class="modal-description">Detalhes do chamado.</p>
+        
+        <!-- Devolução description block if returned -->
+        <div id="modal-devolucao-reason-box" class="modal-devolucao-box" style="display: none;">
+          <h5>Motivo da Devolução</h5>
+          <p id="modal-devolucao-reason">-</p>
+        </div>
+      </div>
+
+      <!-- Attachment section -->
+      <div id="modal-attachment-area" class="modal-attachment-section" style="display: none;">
+        <h4>Arquivo Anexo</h4>
+        <div class="modal-attachment-card">
+          <div class="attachment-info">
+            <i data-lucide="file" class="attachment-file-icon"></i>
+            <span id="modal-attachment-name" class="attachment-name">documento.pdf</span>
+          </div>
+          <a href="#" id="modal-attachment-download" class="glow-btn modal-attachment-btn" style="padding: 6px 12px; border-radius:4px;" download>
+            <i data-lucide="download" style="width:14px;height:14px;"></i> Baixar
+          </a>
+        </div>
+      </div>
+
+      <!-- Action buttons for handling ticket status -->
+      <div id="modal-action-row" class="modal-actions" style="display: none;">
+        <button id="btn-action-start" class="action-status-btn iniciar" onclick="updateTicketStatus('andamento')">
+          <i data-lucide="play" style="width:16px;height:16px;"></i> Iniciar Atendimento
+        </button>
+        <button id="btn-action-complete" class="action-status-btn concluir" onclick="updateTicketStatus('concluido')">
+          <i data-lucide="check" style="width:16px;height:16px;"></i> Concluir Processo
+        </button>
+        <button id="btn-action-return" class="action-status-btn devolver" onclick="showDevolucaoInput()">
+          <i data-lucide="corner-up-left" style="width:16px;height:16px;"></i> Devolver Chamado
+        </button>
+      </div>
+
+      <!-- Devolution input panel -->
+      <div id="devolucao-input-area" class="devolucao-input-area">
+        <label class="form-label" for="devolucao-reason-text" style="color: var(--status-devolvido)">Justificativa de Devolução</label>
+        <textarea id="devolucao-reason-text" class="form-textarea" placeholder="Descreva os motivos pelos quais este processo está sendo devolvido para a origem..." required></textarea>
+        <div class="devolucao-input-actions">
+          <button class="action-status-btn" onclick="cancelDevolucao()">Cancelar</button>
+          <button class="action-status-btn devolver" onclick="submitDevolucao()">Confirmar Devolução</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="mockData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
