@@ -144,7 +144,7 @@ function handleLogin(e) {
   currentUser = user;
   sessionStorage.setItem("current_rocket_user", JSON.stringify(user));
   
-  showAlert("success", `Bem-vindo de volta, ${user.name}!`);
+  showAlert("success", `✅ Bem-vindo ao SISMV, ${user.name}!`);
   
   setTimeout(() => {
     e.target.reset();

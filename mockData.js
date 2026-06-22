@@ -1,4 +1,4 @@
-// Dados mockados iniciais para o RocketFlow
+// Dados mockados iniciais para o SISMV - Sistema Integrado da Super MegaVendas
 const initialTickets = [
   {
     id: "CH-001",

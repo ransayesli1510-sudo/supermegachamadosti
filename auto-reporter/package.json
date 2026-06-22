@@ -1,0 +1,11 @@
+{
+  "name": "supermegachamadosti-sub",
+  "version": "1.0.0",
+  "description": "RocketFlow intersectoral tickets and BI portal",
+  "main": "index.html",
+  "scripts": {
+    "build": "mkdir -p dist && cp index.html style.css app.js mockData.js dist/"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
